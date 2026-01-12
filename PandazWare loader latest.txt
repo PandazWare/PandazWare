@@ -1,0 +1,384 @@
+--[[
+    PANDAZWARE MOBILE LOADER V4 (ULTIMATE EDITION)
+    
+    Credits:
+    - Loader UI: PandazWare
+    - Logic Upgrades: AI Integration
+]]
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local TextService = game:GetService("TextService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+
+-- ========================================== --
+--       1. CUSTOM NOTIFICATION LIBRARY       --
+-- ========================================== --
+local NotificationLibrary = (function()
+    local lib = {}
+    local function getSafeParent()
+        if gethui then return gethui()
+        elseif CoreGui then return CoreGui
+        else return Players.LocalPlayer:WaitForChild("PlayerGui") end
+    end
+
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "PandazNotifications"
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ScreenGui.Parent = getSafeParent()
+
+    local Container = Instance.new("Frame")
+    Container.Name = "NotificationContainer"
+    Container.Parent = ScreenGui
+    Container.BackgroundTransparency = 1
+    Container.Position = UDim2.new(0.5, -125, 0.05, 0) 
+    Container.Size = UDim2.new(0, 250, 0.8, 0) 
+    Container.ClipsDescendants = false
+
+    local UIListLayout = Instance.new("UIListLayout")
+    UIListLayout.Parent = Container
+    UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    UIListLayout.Padding = UDim.new(0, 8)
+    UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+    function lib.Notify(title, text, duration)
+        title, text, duration = title or "System", text or "...", duration or 3
+        local Frame = Instance.new("Frame")
+        Frame.Parent = Container
+        Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25) 
+        Frame.BorderSizePixel = 0; Frame.Size = UDim2.new(1, 0, 0, 0) 
+        Frame.BackgroundTransparency = 1; Frame.ClipsDescendants = true
+        Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 10)
+        
+        local UIStroke = Instance.new("UIStroke", Frame)
+        UIStroke.Color = Color3.fromRGB(60, 60, 60); UIStroke.Thickness = 1.5; UIStroke.Transparency = 1
+
+        local TitleLabel = Instance.new("TextLabel", Frame)
+        TitleLabel.BackgroundTransparency = 1; TitleLabel.Position = UDim2.new(0.05,0,0,5)
+        TitleLabel.Size = UDim2.new(0.9,0,0,20); TitleLabel.Font = Enum.Font.GothamBold
+        TitleLabel.Text = title; TitleLabel.TextColor3 = Color3.fromRGB(255,255,255)
+        TitleLabel.TextSize = 14; TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        TitleLabel.TextTransparency = 1
+
+        local DescLabel = Instance.new("TextLabel", Frame)
+        DescLabel.BackgroundTransparency = 1; DescLabel.Position = UDim2.new(0.05,0,0,25)
+        DescLabel.Size = UDim2.new(0.9,0,1,-30); DescLabel.Font = Enum.Font.Gotham
+        DescLabel.Text = text; DescLabel.TextColor3 = Color3.fromRGB(200,200,200)
+        DescLabel.TextSize = 12; DescLabel.TextWrapped = true
+        DescLabel.TextXAlignment = Enum.TextXAlignment.Left; DescLabel.TextYAlignment = Enum.TextYAlignment.Top
+        DescLabel.TextTransparency = 1
+
+        local targetHeight = math.clamp(TextService:GetTextSize(text, 12, Enum.Font.Gotham, Vector2.new(225, 1000)).Y + 35, 50, 150)
+        local openInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+        
+        TweenService:Create(Frame, openInfo, {Size = UDim2.new(1, 0, 0, targetHeight), BackgroundTransparency = 0.1}):Play()
+        TweenService:Create(UIStroke, openInfo, {Transparency = 0}):Play()
+        task.spawn(function() task.wait(0.1); TweenService:Create(TitleLabel, openInfo, {TextTransparency = 0}):Play(); TweenService:Create(DescLabel, openInfo, {TextTransparency = 0}):Play() end)
+
+        local ProgressBar = Instance.new("Frame", Frame)
+        ProgressBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255); ProgressBar.BorderSizePixel = 0
+        ProgressBar.Position = UDim2.new(0,0,1,-2); ProgressBar.Size = UDim2.new(0,0,0,2)
+        TweenService:Create(ProgressBar, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(1,0,0,2)}):Play()
+
+        task.delay(duration, function()
+            if not Frame then return end
+            local closeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+            TweenService:Create(TitleLabel, closeInfo, {TextTransparency = 1}):Play()
+            TweenService:Create(DescLabel, closeInfo, {TextTransparency = 1}):Play()
+            TweenService:Create(UIStroke, closeInfo, {Transparency = 1}):Play()
+            local closeTween = TweenService:Create(Frame, closeInfo, {Size = UDim2.new(1,0,0,0), BackgroundTransparency = 1})
+            closeTween:Play(); closeTween.Completed:Connect(function() Frame:Destroy() end)
+        end)
+    end
+    return lib
+end)()
+NotificationLibrary.Notify("PandazWare", "Loader initializing...", 2)
+
+-- ========================================== --
+--             MOBILE GUI SETUP               --
+-- ========================================== --
+local PandazGUI = Instance.new("ScreenGui")
+PandazGUI.Name = "PandazWare_Loader"
+PandazGUI.Parent = gethui and gethui() or CoreGui
+PandazGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; PandazGUI.IgnoreGuiInset = true
+
+local ToggleBtn = Instance.new("TextButton", PandazGUI)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 25); ToggleBtn.Position = UDim2.new(0.02, 0, 0.2, 0)
+ToggleBtn.Size = UDim2.new(0, 50, 0, 50); ToggleBtn.Font = Enum.Font.FredokaOne
+ToggleBtn.Text = "PZ"; ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255); ToggleBtn.TextSize = 22
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 12)
+Instance.new("UIStroke", ToggleBtn).Color = Color3.fromRGB(80, 80, 80); ToggleBtn.UIStroke.Thickness = 1.5
+
+local MainFrame = Instance.new("Frame", PandazGUI)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15); MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5); MainFrame.Size = UDim2.new(0.6, 0, 0.55, 0); MainFrame.Visible = false
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 16)
+Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(60, 60, 60); MainFrame.UIStroke.Thickness = 1.5
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.BackgroundTransparency = 1; Title.Position = UDim2.new(0,0,0.05,0); Title.Size = UDim2.new(1,0,0.15,0)
+Title.Font = Enum.Font.GothamBold; Title.Text = "PandazWare Loader"; Title.TextColor3 = Color3.fromRGB(255,255,255); Title.TextSize = 20
+
+local CloseBtn = Instance.new("TextButton", MainFrame)
+CloseBtn.BackgroundTransparency = 1; CloseBtn.Position = UDim2.new(0.85,0,0.02,0); CloseBtn.Size = UDim2.new(0.12,0,0.12,0)
+CloseBtn.Font = Enum.Font.FredokaOne; CloseBtn.Text = "X"; CloseBtn.TextColor3 = Color3.fromRGB(220,60,60); CloseBtn.TextSize = 20
+CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false; ToggleBtn.Visible = true end)
+
+local ScrollContainer = Instance.new("ScrollingFrame", MainFrame)
+ScrollContainer.BackgroundTransparency = 1; ScrollContainer.Position = UDim2.new(0.05,0,0.22,0); ScrollContainer.Size = UDim2.new(0.9,0,0.72,0)
+ScrollContainer.CanvasSize = UDim2.new(0,0,1.2,0); ScrollContainer.ScrollBarThickness = 2
+local UIList = Instance.new("UIListLayout", ScrollContainer); UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center; UIList.Padding = UDim.new(0, 8)
+
+local function CreateGameButton(text, callback)
+    local BtnFrame = Instance.new("Frame", ScrollContainer)
+    BtnFrame.Size = UDim2.new(0.98,0,0,45); BtnFrame.BackgroundColor3 = Color3.fromRGB(25,25,30)
+    Instance.new("UICorner", BtnFrame).CornerRadius = UDim.new(0, 8)
+    local InteractBtn = Instance.new("TextButton", BtnFrame)
+    InteractBtn.Size = UDim2.new(1,0,1,0); InteractBtn.BackgroundTransparency = 1; InteractBtn.Font = Enum.Font.GothamSemibold
+    InteractBtn.Text = text; InteractBtn.TextColor3 = Color3.fromRGB(255,255,255); InteractBtn.TextSize = 15
+    InteractBtn.MouseButton1Click:Connect(function() NotificationLibrary.Notify("Loading", text.."...", 2); if callback then callback() end end)
+end
+
+-- Drag Logic
+local dragging, dragInput, dragStart, startPos
+local function update(input) local delta = input.Position - dragStart; MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end
+MainFrame.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true; dragStart = input.Position; startPos = MainFrame.Position end end)
+MainFrame.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
+UserInputService.InputChanged:Connect(function(input) if input == dragInput and dragging then update(input) end end)
+ToggleBtn.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
+
+-- BUTTONS
+CreateGameButton("Counter Blox", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/PandazWare/PandazWare/refs/heads/main/pandazware%202.txt"))() end)
+CreateGameButton("Arsenal", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/Smokernosexyz/Offenseware-mobile-arsenal/refs/heads/main/Offenseware%20mobile%20script"))() end)
+-- >> Gunfight Arena (ULTIMATE INTEGRATED)
+CreateGameButton("Gunfight Arena", function()
+    NotificationLibrary.Notify("System", "Loading Ultimate Gunfight Logic...", 2)
+    
+    task.spawn(function()
+        local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/jensonhirst/Orion/main/source')))()
+        local Window = OrionLib:MakeWindow({Name = "Gunfight Arena [Ultimate]", HidePremium = false, SaveConfig = true, IntroEnabled = false})
+        local player = Players.LocalPlayer
+        local camera = Workspace.CurrentCamera
+        
+        -- VARIABLEN FÜR FEATURES
+        local aimbot = false
+        local silentaim = false
+        local norecoil = false
+        local hitboxSize = 2
+        local espEnabled = false
+        local fullbright = false
+
+        -- === COMBAT TAB === --
+        local combatTab = Window:MakeTab({ Name = "Combat", Icon = "rbxassetid://4483345998" })
+        local combatSec = combatTab:AddSection({ Name = "Aimbot & Shooting" })
+
+        -- 1. Camera Aimbot (Neu)
+        combatSec:AddToggle({
+            Name = "Camera Aimbot (Lock)",
+            Default = false,
+            Callback = function(Value) aimbot = Value end
+        })
+
+        -- 2. Silent Aim (Raw Logic Improved)
+        combatSec:AddToggle({
+            Name = "Silent Aim (Bullet Redirect)",
+            Default = false,
+            Callback = function(Value) silentaim = Value end
+        })
+
+        -- 3. No Recoil (Steadiness)
+        combatSec:AddToggle({
+            Name = "No Recoil",
+            Default = false,
+            Callback = function(Value)
+                norecoil = Value
+                if Value then
+                    RunService:BindToRenderStep("NoRecoilLoop", 100, function()
+                        pcall(function()
+                            if player.PlayerScripts.Vortex.Modifiers:FindFirstChild("Steadiness") then
+                                player.PlayerScripts.Vortex.Modifiers.Steadiness.Value = 0
+                            end
+                        end)
+                    end)
+                else
+                    RunService:UnbindFromRenderStep("NoRecoilLoop")
+                end
+            end
+        })
+
+        -- === LOGIC HELPERS === --
+        local function getClosestPlayer()
+            local team = player:GetAttribute("Team")
+            local closest, distance = nil, math.huge
+            for _, char in ipairs(Workspace:GetChildren()) do
+                if char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 and char.Name ~= player.Name then
+                    local p = Players:FindFirstChild(char.Name)
+                    if p and p:GetAttribute("Team") ~= team then
+                        local head = char:FindFirstChild("Head")
+                        if head then
+                            local w2s, onScreen = camera:WorldToViewportPoint(head.Position)
+                            if onScreen then
+                                local dist = (Vector2.new(w2s.X, w2s.Y) - Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)).Magnitude
+                                if dist < distance then closest = char; distance = dist end
+                            end
+                        end
+                    end
+                end
+            end
+            return closest
+        end
+
+        -- Main Loop (Aimbot Execution)
+        RunService.RenderStepped:Connect(function()
+            local target = getClosestPlayer()
+            if target and target:FindFirstChild("Head") then
+                -- Camera Aimbot Logic
+                if aimbot then
+                    camera.CFrame = CFrame.new(camera.CFrame.Position, target.Head.Position)
+                end
+            end
+        end)
+
+        -- Silent Aim Hook
+        local oldIndex
+        oldIndex = hookmetamethod(game, "__index", function(self, index)
+            if not checkcaller() and self == camera and index == "CFrame" and silentaim then
+                local target = getClosestPlayer()
+                if target and target:FindFirstChild("Head") then
+                    return CFrame.new(camera.CFrame.Position, target.Head.Position)
+                end
+            end
+            return oldIndex(self, index)
+        end)
+        -- === VISUALS TAB === --
+        local visualTab = Window:MakeTab({ Name = "Visuals", Icon = "rbxassetid://4483345998" })
+        
+        -- ESP Highlight
+        visualTab:AddToggle({
+            Name = "ESP (Highlight)",
+            Default = false,
+            Callback = function(Value)
+                espEnabled = Value
+                if Value then
+                    RunService:BindToRenderStep("ESPLoop", 200, function()
+                        for _, v in pairs(Players:GetPlayers()) do
+                            if v ~= player and v.Character then
+                                if not v.Character:FindFirstChild("HighlightESP") then
+                                    local hl = Instance.new("Highlight", v.Character)
+                                    hl.Name = "HighlightESP"; hl.FillColor = Color3.fromRGB(255,0,0); hl.OutlineColor = Color3.fromRGB(255,255,255)
+                                end
+                            end
+                        end
+                    end)
+                else
+                    RunService:UnbindFromRenderStep("ESPLoop")
+                    for _, v in pairs(Players:GetPlayers()) do
+                        if v.Character and v.Character:FindFirstChild("HighlightESP") then v.Character.HighlightESP:Destroy() end
+                    end
+                end
+            end
+        })
+
+        -- Hitbox Expander
+        visualTab:AddSlider({
+            Name = "Hitbox Size",
+            Min = 2, Max = 20, Default = 2, Color = Color3.fromRGB(255,0,0),
+            Increment = 1,
+            ValueName = "Studs",
+            Callback = function(Value)
+                hitboxSize = Value
+            end
+        })
+        
+        -- Hitbox Loop
+        RunService.RenderStepped:Connect(function()
+            if hitboxSize > 2 then
+                for _, v in ipairs(Players:GetPlayers()) do
+                    if v ~= player and v.Character and v.Character:FindFirstChild("Head") then
+                        v.Character.Head.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+                        v.Character.Head.Transparency = 0.6
+                        v.Character.Head.CanCollide = false
+                    end
+                end
+            end
+        end)
+
+        -- Fullbright
+        visualTab:AddToggle({
+            Name = "Full Bright",
+            Default = false,
+            Callback = function(Value)
+                if Value then
+                    Lighting.Brightness = 2; Lighting.ClockTime = 14; Lighting.FogEnd = 100000; Lighting.GlobalShadows = false
+                else
+                    Lighting.Brightness = 1; Lighting.GlobalShadows = true
+                end
+            end
+        })
+
+        -- === MOVEMENT TAB === --
+        local moveTab = Window:MakeTab({ Name = "Movement", Icon = "rbxassetid://4483345998" })
+        moveTab:AddTextbox({
+            Name = "Walk Speed", Default = "16", TextDisappear = false,
+            Callback = function(Value)
+                if player.Character and player.Character:FindFirstChild("Humanoid") then
+                    player.Character.Humanoid.WalkSpeed = tonumber(Value) or 16
+                end
+            end
+        })
+        moveTab:AddTextbox({
+            Name = "Jump Power", Default = "50", TextDisappear = false,
+            Callback = function(Value)
+                if player.Character and player.Character:FindFirstChild("Humanoid") then
+                    player.Character.Humanoid.UseJumpPower = true
+                    player.Character.Humanoid.JumpPower = tonumber(Value) or 50
+                end
+            end
+        })
+
+        -- === WEAPONS TAB === --
+        local weapontab = Window:MakeTab({ Name = "Weapons", Icon = "rbxassetid://4483345998" })
+        
+        -- Automatisches Scannen der Waffen
+        local weapons = {}
+        if game:GetService("ReplicatedStorage"):FindFirstChild("Weapons") then
+            for _,v in pairs(game:GetService("ReplicatedStorage").Weapons:GetChildren()) do table.insert(weapons,v.Name) end
+        end
+
+        local selectedSecondary = nil
+        if #weapons > 0 then
+            weapontab:AddDropdown({
+                Name = "Select Secondary", Default = weapons[1], Options = weapons,
+                Callback = function(Value) selectedSecondary = Value end
+            })
+            weapontab:AddButton({
+                Name = "Equip (Reset Character)",
+                Callback = function()
+                    if selectedSecondary then
+                        player:SetAttribute("Secondary", selectedSecondary)
+                        NotificationLibrary.Notify("Equipped", "Reset Character now!", 3)
+                    end
+                end
+            })
+        else
+            weapontab:AddLabel("No Weapons found via Scan")
+        end
+        
+        -- Fallback Text Input (falls Dropdown nicht geht)
+        weapontab:AddTextbox({
+            Name = "Force Weapon Name", Default = "", TextDisappear = false,
+            Callback = function(Value)
+                player:SetAttribute("Secondary", Value)
+                player:SetAttribute("Primary", Value)
+                NotificationLibrary.Notify("Forced", "Weapon set. Reset now.", 3)
+            end
+        })
+
+        OrionLib:Init()
+        NotificationLibrary.Notify("Success", "Ultimate Features Loaded!", 3)
+    end)
+end)
