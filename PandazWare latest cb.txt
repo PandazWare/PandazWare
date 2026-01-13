@@ -1,0 +1,494 @@
+-- // POKKAWARE -> PANDAZWARE MOBILE // --
+-- UI: Custom Link (PandazWare mobile liabry)
+-- Features: Aimbot, Chams, Gun Mods, Spinbot
+
+getgenv().SecureMode = true
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
+local Debris = Workspace:FindFirstChild("Debris")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- // FEATURES & FLAGS // --
+local Flags = {
+    Aimbot = false, FOV = 100, Smooth = 0.5, WallCheck = true, HitChance = 100,
+    SilentAim = false, Hitbox = false, HitboxSize = 4, Spinbot = false, SpinSpeed = 50,
+    ESP_Box = false, ESP_Skel = false, ESP_Trace = false, ESP_Chams = false, Fullbright = false, ClearMap = false,
+    NoRecoil = false, NoSpread = false, RapidFire = false, InfAmmo = false, InstaReload = false,
+    TP = false, TPDist = 12, Speed = false, SpeedVal = 16, Bhop = false
+}
+
+-- // VISUALS HELPERS // --
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Color = Color3.fromRGB(120, 100, 255)
+FOVCircle.Thickness = 1.5; FOVCircle.NumSides = 60; FOVCircle.Visible = false; FOVCircle.Filled = false
+
+local SkeletonConnections = {
+    {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"}, {"Head", "Torso"},
+    {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"LeftLowerArm", "LeftHand"},
+    {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"RightLowerArm", "RightHand"},
+    {"Torso", "Left Arm"}, {"Torso", "Right Arm"},
+    {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LeftLowerLeg", "LeftFoot"},
+    {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}, {"RightLowerLeg", "RightFoot"},
+    {"Torso", "Left Leg"}, {"Torso", "Right Leg"}
+}
+
+local DrawCache = {Skeleton = {}, Tracers = {}, Chams = {}}
+
+local function UpdateSkeleton(plr)
+    if not DrawCache.Skeleton[plr] then DrawCache.Skeleton[plr] = {} end
+    local cache = DrawCache.Skeleton[plr]
+    
+    if Flags.ESP_Skel and plr.Character and plr.Team ~= LocalPlayer.Team then
+        local char = plr.Character
+        for i, pair in pairs(SkeletonConnections) do
+            local partA = char:FindFirstChild(pair[1])
+            local partB = char:FindFirstChild(pair[2])
+            
+            if partA and partB then
+                local line = cache[i]
+                if not line then
+                    line = Drawing.new("Line")
+                    line.Thickness = 1.5; line.Color = Color3.fromRGB(255, 255, 255); line.Transparency = 1
+                    cache[i] = line
+                end
+                
+                local vecA, visA = Camera:WorldToViewportPoint(partA.Position)
+                local vecB, visB = Camera:WorldToViewportPoint(partB.Position)
+                
+                if visA and visB then
+                    line.Visible = true
+                    line.From = Vector2.new(vecA.X, vecA.Y)
+                    line.To = Vector2.new(vecB.X, vecB.Y)
+                else
+                    line.Visible = false
+                end
+            else
+                if cache[i] then cache[i].Visible = false end
+            end
+        end
+    else
+        for _, line in pairs(cache) do line.Visible = false end
+    end
+end
+
+local function UpdateChams(plr)
+    if not plr.Character then return end
+    if not Flags.ESP_Chams or plr.Team == LocalPlayer.Team then
+        if DrawCache.Chams[plr] then
+            for _, v in pairs(DrawCache.Chams[plr]) do v:Destroy() end
+            DrawCache.Chams[plr] = nil
+        end
+        return
+    end
+    if not DrawCache.Chams[plr] then DrawCache.Chams[plr] = {} end
+    for _, part in pairs(plr.Character:GetChildren()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            if not DrawCache.Chams[plr][part] then
+                local cham = Instance.new("BoxHandleAdornment")
+                cham.Name = "PZ_Cham"
+                cham.Adornee = part
+                cham.Parent = part
+                cham.Size = part.Size
+                cham.Color3 = Color3.fromRGB(255, 0, 0)
+                cham.AlwaysOnTop = true
+                cham.ZIndex = 5
+                cham.Transparency = 0.5
+                DrawCache.Chams[plr][part] = cham
+            end
+        end
+    end
+end
+
+local function UpdateTracers(plr)
+    if not DrawCache.Tracers[plr] then 
+        local t = Drawing.new("Line")
+        t.Thickness = 1; t.Color = Color3.fromRGB(120, 100, 255)
+        DrawCache.Tracers[plr] = t
+    end
+    local line = DrawCache.Tracers[plr]
+    
+    if Flags.ESP_Trace and plr.Character and plr.Team ~= LocalPlayer.Team and plr.Character:FindFirstChild("HumanoidRootPart") then
+        local root = plr.Character.HumanoidRootPart
+        local vec, vis = Camera:WorldToViewportPoint(root.Position)
+        if vis then
+            line.Visible = true
+            line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+            line.To = Vector2.new(vec.X, vec.Y)
+        else
+            line.Visible = false
+        end
+    else
+        line.Visible = false
+    end
+end
+
+-- // AIM & MODS LOGIC // --
+local function GetTarget()
+    local closest, maxDist = nil, Flags.FOV
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Team ~= LocalPlayer.Team and p.Character and p.Character:FindFirstChild("Head") and p.Character.Humanoid.Health > 0 then
+            
+            -- HIT CHANCE LOGIC
+            local targetPart = p.Character.Head
+            if math.random(1, 100) > Flags.HitChance then
+                targetPart = p.Character:FindFirstChild("UpperTorso") or p.Character:FindFirstChild("Torso") or p.Character.Head
+            end
+
+            local pos, vis = Camera:WorldToViewportPoint(targetPart.Position)
+            if vis then
+                local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                if dist < maxDist then
+                    local isVisible = true
+                    if Flags.WallCheck then
+                        local ray = Ray.new(Camera.CFrame.Position, (targetPart.Position - Camera.CFrame.Position).Unit * 500)
+                        local hit = Workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character, Camera})
+                        if hit and not hit:IsDescendantOf(p.Character) then isVisible = false end
+                    end
+                    if isVisible then closest = targetPart; maxDist = dist end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+local function ApplyGunMods()
+    local W = ReplicatedStorage:WaitForChild("Weapons")
+    for _, w in ipairs(W:GetChildren()) do
+        if Flags.RapidFire and w:FindFirstChild("FireRate") then w.FireRate.Value = 0 end
+        if Flags.NoSpread then
+             local s = w:FindFirstChild("Spread")
+             if s then
+                if s:IsA("ValueBase") then s.Value = 0 end
+                for _, c in ipairs(s:GetChildren()) do if c:IsA("NumberValue") then c.Value = 0 end end
+             end
+        end
+        if Flags.NoRecoil then
+             local r = w:FindFirstChild("Recoil")
+             if r then for _, c in ipairs(r:GetChildren()) do if c:IsA("NumberValue") then c.Value = 0 end end end
+        end
+        if Flags.InfAmmo and w:FindFirstChild("Ammo") then w.Ammo.Value = 999 end
+        if Flags.InfAmmo and w:FindFirstChild("StoredAmmo") then w.StoredAmmo.Value = 9999 end
+        if Flags.InstaReload and w:FindFirstChild("ReloadTime") then w.ReloadTime.Value = 0.05 end
+    end
+end
+-- // UI SETUP (PANDAZWARE MOBILE) // --
+
+-- Lade deine Library
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/PandazWare/PandazWare/refs/heads/main/PandazWare%20mobile%20liabry"))()
+
+-- Erstelle Fenster (Standard Rayfield/Orion Syntax angenommen)
+local Window = Library:CreateWindow({
+    Name = "PandazWare Mobile",
+    LoadingTitle = "PandazWare",
+    LoadingSubtitle = "by Pandaz",
+    ConfigurationSaving = {
+       Enabled = true,
+       FolderName = "PandazWareMobile",
+       FileName = "Config"
+    }
+})
+
+-- [ LEGIT TAB ]
+local LegitTab = Window:CreateTab("Legit")
+
+LegitTab:CreateToggle({
+    Name = "Aimbot",
+    CurrentValue = false,
+    Callback = function(v) Flags.Aimbot = v end
+})
+
+LegitTab:CreateSlider({
+    Name = "FOV Radius",
+    Range = {10, 400},
+    Increment = 1,
+    CurrentValue = 100,
+    Callback = function(v) Flags.FOV = v end
+})
+
+LegitTab:CreateSlider({
+    Name = "Smoothness",
+    Range = {0, 10},
+    Increment = 1,
+    CurrentValue = 5,
+    Callback = function(v) Flags.Smooth = v/10 end
+})
+
+LegitTab:CreateSlider({
+    Name = "Hit Chance %",
+    Range = {0, 100},
+    Increment = 1,
+    CurrentValue = 100,
+    Callback = function(v) Flags.HitChance = v end
+})
+
+LegitTab:CreateToggle({
+    Name = "Wall Check",
+    CurrentValue = true,
+    Callback = function(v) Flags.WallCheck = v end
+})
+
+LegitTab:CreateToggle({
+    Name = "Show FOV",
+    CurrentValue = false,
+    Callback = function(v) Flags.ShowFOV = v end
+})
+
+-- [ RAGE TAB ]
+local RageTab = Window:CreateTab("Rage")
+
+RageTab:CreateToggle({
+    Name = "Silent Aim",
+    CurrentValue = false,
+    Callback = function(v) Flags.SilentAim = v end
+})
+
+RageTab:CreateToggle({
+    Name = "Hitbox Extender",
+    CurrentValue = false,
+    Callback = function(v) Flags.Hitbox = v end
+})
+
+RageTab:CreateSlider({
+    Name = "Hitbox Size",
+    Range = {2, 15},
+    Increment = 1,
+    CurrentValue = 4,
+    Callback = function(v) Flags.HitboxSize = v end
+})
+
+RageTab:CreateToggle({
+    Name = "Spinbot",
+    CurrentValue = false,
+    Callback = function(v) Flags.Spinbot = v end
+})
+
+RageTab:CreateSlider({
+    Name = "Spin Speed",
+    Range = {10, 100},
+    Increment = 1,
+    CurrentValue = 50,
+    Callback = function(v) Flags.SpinSpeed = v end
+})
+
+-- [ VISUALS TAB ]
+local VisTab = Window:CreateTab("Visuals")
+
+VisTab:CreateToggle({
+    Name = "Chams (Wallhack)",
+    CurrentValue = false,
+    Callback = function(v) Flags.ESP_Chams = v end
+})
+
+VisTab:CreateToggle({
+    Name = "Box ESP",
+    CurrentValue = false,
+    Callback = function(v) Flags.ESP_Box = v end
+})
+
+VisTab:CreateToggle({
+    Name = "Skeleton ESP",
+    CurrentValue = false,
+    Callback = function(v) Flags.ESP_Skel = v end
+})
+
+VisTab:CreateToggle({
+    Name = "Tracers",
+    CurrentValue = false,
+    Callback = function(v) Flags.ESP_Trace = v end
+})
+
+VisTab:CreateToggle({
+    Name = "Fullbright",
+    CurrentValue = false,
+    Callback = function(v) Flags.Fullbright = v end
+})
+
+VisTab:CreateToggle({
+    Name = "Clear Map (No Fog/Debris)",
+    CurrentValue = false,
+    Callback = function(v) Flags.ClearMap = v end
+})
+
+-- [ GUN MODS TAB ]
+local GunTab = Window:CreateTab("Gun Mods")
+
+GunTab:CreateToggle({
+    Name = "No Recoil",
+    CurrentValue = false,
+    Callback = function(v) Flags.NoRecoil = v end
+})
+
+GunTab:CreateToggle({
+    Name = "No Spread",
+    CurrentValue = false,
+    Callback = function(v) Flags.NoSpread = v end
+})
+
+GunTab:CreateToggle({
+    Name = "Rapid Fire",
+    CurrentValue = false,
+    Callback = function(v) Flags.RapidFire = v end
+})
+
+GunTab:CreateToggle({
+    Name = "Infinite Ammo",
+    CurrentValue = false,
+    Callback = function(v) Flags.InfAmmo = v end
+})
+
+GunTab:CreateToggle({
+    Name = "Instant Reload",
+    CurrentValue = false,
+    Callback = function(v) Flags.InstaReload = v end
+})
+
+-- [ MISC TAB ]
+local MiscTab = Window:CreateTab("Misc")
+
+MiscTab:CreateToggle({
+    Name = "3rd Person",
+    CurrentValue = false,
+    Callback = function(v) Flags.TP = v end
+})
+
+MiscTab:CreateSlider({
+    Name = "TP Distance",
+    Range = {5, 30},
+    Increment = 1,
+    CurrentValue = 12,
+    Callback = function(v) Flags.TPDist = v end
+})
+
+MiscTab:CreateToggle({
+    Name = "Speed Hack",
+    CurrentValue = false,
+    Callback = function(v) Flags.Speed = v end
+})
+
+MiscTab:CreateSlider({
+    Name = "Speed Value",
+    Range = {16, 100},
+    Increment = 1,
+    CurrentValue = 25,
+    Callback = function(v) Flags.SpeedVal = v end
+})
+
+MiscTab:CreateToggle({
+    Name = "Auto Bhop",
+    CurrentValue = false,
+    Callback = function(v) Flags.Bhop = v end
+})
+-- // LOOPS // --
+
+RunService.RenderStepped:Connect(function()
+    -- FOV
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    FOVCircle.Radius = Flags.FOV
+    FOVCircle.Visible = Flags.ShowFOV
+
+    -- Aimbot
+    if Flags.Aimbot and not Flags.SilentAim then
+        local t = GetTarget()
+        if t then
+            local cf = CFrame.new(Camera.CFrame.Position, t.Position)
+            Camera.CFrame = Camera.CFrame:Lerp(cf, 1 - Flags.Smooth)
+        end
+    elseif Flags.SilentAim then
+        local t = GetTarget()
+        if t then Camera.CFrame = CFrame.new(Camera.CFrame.Position, t.Position) end
+    end
+
+    -- Spinbot
+    if Flags.Spinbot and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local root = LocalPlayer.Character.HumanoidRootPart
+        root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(Flags.SpinSpeed), 0)
+    end
+    
+    -- Visuals Update
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            UpdateSkeleton(p)
+            UpdateTracers(p)
+            UpdateChams(p)
+        end
+    end
+end)
+
+local AdornmentCache = {}
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        
+        if Flags.NoRecoil or Flags.NoSpread or Flags.RapidFire or Flags.InfAmmo or Flags.InstaReload then
+            ApplyGunMods()
+        end
+        
+        if Flags.ClearMap then
+             if Debris then Debris:ClearAllChildren() end
+             Lighting.FogEnd = 999999
+        end
+
+        if Flags.ESP_Box then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Team ~= LocalPlayer.Team and p.Character then
+                    if not AdornmentCache[p] then
+                        local b = Instance.new("BoxHandleAdornment", p.Character)
+                        b.Adornee = p.Character:FindFirstChild("HumanoidRootPart")
+                        b.Size = Vector3.new(4,5,1)
+                        b.AlwaysOnTop = true
+                        b.Transparency = 0.5
+                        b.Color3 = Color3.fromRGB(120, 100, 255)
+                        AdornmentCache[p] = b
+                    end
+                end
+            end
+        else
+            for i,v in pairs(AdornmentCache) do v:Destroy() end
+            AdornmentCache = {}
+        end
+
+        if Flags.Hitbox then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Team ~= LocalPlayer.Team and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local root = p.Character.HumanoidRootPart
+                    root.Size = Vector3.new(Flags.HitboxSize, Flags.HitboxSize, Flags.HitboxSize)
+                    root.Transparency = 0.7
+                    root.CanCollide = false
+                    root.Material = Enum.Material.Neon
+                    root.Color = Color3.fromRGB(255, 0, 0)
+                end
+            end
+        end
+        
+        if Flags.Fullbright then Lighting.Brightness = 2; Lighting.ClockTime = 14 else Lighting.Brightness = 1 end
+        
+        if Flags.Speed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = Flags.SpeedVal
+        end
+        
+        if Flags.Bhop and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+             if LocalPlayer.Character.Humanoid.MoveDirection.Magnitude > 0 and LocalPlayer.Character.Humanoid.FloorMaterial ~= Enum.Material.Air then
+                 LocalPlayer.Character.Humanoid.Jump = true
+             end
+        end
+        
+        if Flags.TP then
+            LocalPlayer.CameraMode = Enum.CameraMode.Classic
+            LocalPlayer.CameraMaxZoomDistance = Flags.TPDist
+            LocalPlayer.CameraMinZoomDistance = Flags.TPDist
+        else
+            LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+            LocalPlayer.CameraMaxZoomDistance = 0.5
+        end
+    end
+end)
