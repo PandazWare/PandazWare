@@ -1,0 +1,350 @@
+local PandazWare = {}
+PandazWare.Version = "1.2 Mobile"
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Player = Players.LocalPlayer
+
+-- GUI Cleanup
+local ParentTarget = Player:WaitForChild("PlayerGui")
+for _, v in pairs(ParentTarget:GetChildren()) do
+	if v.Name:find("PandazWare") then v:Destroy() end
+end
+
+local GUI = Instance.new("ScreenGui")
+GUI.Name = "PandazWare"
+GUI.ResetOnSpawn = false
+GUI.DisplayOrder = 10000
+GUI.IgnoreGuiInset = true
+GUI.Parent = ParentTarget
+
+local Theme = {
+	Main = Color3.fromRGB(15, 15, 15),       
+	Sidebar = Color3.fromRGB(20, 20, 20),    
+	Element = Color3.fromRGB(25, 25, 30),    
+	Stroke = Color3.fromRGB(40, 40, 40),     
+	Accent = Color3.fromRGB(0, 255, 170), -- Neuer "Panda/Toxic" Accent
+	Text = Color3.fromRGB(230, 230, 230),
+	Muted = Color3.fromRGB(100, 100, 100),
+	Font = Enum.Font.GothamBold, -- Besser lesbar auf Mobile
+}
+
+local function Tween(obj, props, time)
+	TweenService:Create(obj, TweenInfo.new(time or 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
+end
+
+-- Mobile-freundliches Draggable Script
+local function MakeDraggable(gui, trigger)
+	local dragging, dragInput, dragStart, startPos
+	local t = trigger or gui
+	
+	t.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = gui.Position
+			
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
+			end)
+		end
+	end)
+	
+	t.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+	
+	UserInputService.InputChanged:Connect(function(input)
+		if input == dragInput and dragging then
+			local delta = input.Position - dragStart
+			gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+end
+
+local Notify
+do
+	local Holder = Instance.new("Frame", GUI)
+	Holder.Position = UDim2.new(0.5, -125, 0.1, 0) -- Oben Mitte für Mobile besser
+	Holder.Size = UDim2.new(0, 250, 0.5, 0)
+	Holder.BackgroundTransparency = 1
+	
+	local List = Instance.new("UIListLayout", Holder)
+	List.SortOrder = Enum.SortOrder.LayoutOrder
+	List.Padding = UDim.new(0, 8)
+
+	function Notify(title, content, duration)
+		local dur = duration or 3
+		local Frame = Instance.new("Frame", Holder)
+		Frame.Size = UDim2.new(1, 0, 0, 50)
+		Frame.BackgroundColor3 = Theme.Main
+		Frame.BackgroundTransparency = 0.1
+		Frame.BorderSizePixel = 0
+		Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 6)
+		Instance.new("UIStroke", Frame).Color = Theme.Stroke
+		
+		local TTitle = Instance.new("TextLabel", Frame)
+		TTitle.Text = title
+		TTitle.Font = Theme.Font
+		TTitle.TextSize = 14
+		TTitle.TextColor3 = Theme.Accent
+		TTitle.BackgroundTransparency = 1
+		TTitle.Size = UDim2.new(1, -10, 0, 20)
+		TTitle.Position = UDim2.new(0, 10, 0, 5)
+		TTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+		local TContent = Instance.new("TextLabel", Frame)
+		TContent.Text = content
+		TContent.Font = Theme.Font
+		TContent.TextSize = 12
+		TContent.TextColor3 = Theme.Text
+		TContent.BackgroundTransparency = 1
+		TContent.Size = UDim2.new(1, -10, 0, 20)
+		TContent.Position = UDim2.new(0, 10, 0, 25)
+		TContent.TextXAlignment = Enum.TextXAlignment.Left
+
+		task.delay(dur, function()
+			Tween(Frame, {BackgroundTransparency = 1}, 0.5)
+			Tween(TTitle, {TextTransparency = 1}, 0.5)
+			Tween(TContent, {TextTransparency = 1}, 0.5)
+			task.wait(0.5)
+			Frame:Destroy()
+		end)
+	end
+end
+
+-- Watermark
+task.spawn(function()
+	local WM = Instance.new("Frame", GUI)
+	WM.Name = "Watermark"
+	WM.AnchorPoint = Vector2.new(0.5, 0) 
+	WM.Size = UDim2.new(0, 200, 0, 24)
+	WM.Position = UDim2.new(0.5, 0, 0.01, 0) -- Ganz oben mitte
+	WM.BackgroundColor3 = Theme.Main
+	WM.BorderSizePixel = 0
+	Instance.new("UICorner", WM).CornerRadius = UDim.new(0, 4)
+	
+	local WMStroke = Instance.new("UIStroke", WM)
+	WMStroke.Color = Theme.Accent
+	WMStroke.Thickness = 1
+	
+	local WMText = Instance.new("TextLabel", WM)
+	WMText.Size = UDim2.new(1, 0, 1, 0)
+	WMText.BackgroundTransparency = 1
+	WMText.TextColor3 = Theme.Text
+	WMText.Font = Theme.Font
+	WMText.TextSize = 12
+	WMText.TextXAlignment = Enum.TextXAlignment.Center 
+	
+	while GUI.Parent do
+		local fps = math.floor(1 / RunService.RenderStepped:Wait())
+		WMText.Text = string.format("PandazWare | FPS: %d", fps)
+		task.wait(0.5)
+	end
+end)
+
+function PandazWare:CreateWindow(info)
+	local Window = {}
+	
+	-- Toggle Button für Mobile (Rund & Verschiebbar)
+	local ToggleBtn = Instance.new("TextButton", GUI)
+	ToggleBtn.Name = "MobileToggle"
+	ToggleBtn.Size = UDim2.new(0, 50, 0, 50)
+	ToggleBtn.Position = UDim2.new(0.1, 0, 0.2, 0) -- Startposition (nicht im Weg)
+	ToggleBtn.BackgroundColor3 = Theme.Main
+	ToggleBtn.Text = "P"
+	ToggleBtn.TextColor3 = Theme.Accent
+	ToggleBtn.Font = Theme.Font
+	ToggleBtn.TextSize = 24
+	Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(1, 0) -- Rund
+	Instance.new("UIStroke", ToggleBtn).Color = Theme.Accent
+	
+	MakeDraggable(ToggleBtn) -- Man kann den Button verschieben
+
+	local Main = Instance.new("Frame", GUI)
+	Main.Name = "MainFrame"
+	Main.Size = UDim2.new(0, 480, 0, 280) -- Etwas kleiner für Mobile
+	Main.Position = UDim2.new(0.5, -240, 0.5, -140)
+	Main.BackgroundColor3 = Theme.Main
+	Main.Visible = true
+	Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 6)
+	
+	local Stroke = Instance.new("UIStroke", Main)
+	Stroke.Color = Theme.Stroke
+	Stroke.Thickness = 1.5
+	
+	-- Toggle Funktion
+	ToggleBtn.MouseButton1Click:Connect(function()
+		Main.Visible = not Main.Visible
+	end)
+	
+	local Sidebar = Instance.new("Frame", Main)
+	Sidebar.Name = "Sidebar"
+	Sidebar.Size = UDim2.new(0, 130, 1, 0)
+	Sidebar.BackgroundColor3 = Theme.Sidebar
+	Sidebar.BorderSizePixel = 0
+	Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 6)
+	
+	-- Fix für eckige Kante rechts an der Sidebar
+	local SidebarFix = Instance.new("Frame", Sidebar)
+	SidebarFix.Size = UDim2.new(0, 10, 1, 0)
+	SidebarFix.Position = UDim2.new(1, -10, 0, 0)
+	SidebarFix.BackgroundColor3 = Theme.Sidebar
+	SidebarFix.BorderSizePixel = 0
+
+	local Title = Instance.new("TextLabel", Sidebar)
+	Title.Text = (info.Title or "PandazWare")
+	Title.Size = UDim2.new(1, -10, 0, 40)
+	Title.Position = UDim2.new(0, 10, 0, 5)
+	Title.BackgroundTransparency = 1
+	Title.TextColor3 = Theme.Accent
+	Title.Font = Theme.Font
+	Title.TextSize = 14
+	Title.TextXAlignment = Enum.TextXAlignment.Left
+	
+	local TabContainer = Instance.new("ScrollingFrame", Sidebar)
+	TabContainer.Position = UDim2.new(0, 0, 0, 50)
+	TabContainer.Size = UDim2.new(1, 0, 1, -50)
+	TabContainer.BackgroundTransparency = 1
+	TabContainer.BorderSizePixel = 0
+	TabContainer.ScrollBarThickness = 0
+	
+	local TabList = Instance.new("UIListLayout", TabContainer)
+	TabList.SortOrder = Enum.SortOrder.LayoutOrder
+	TabList.Padding = UDim.new(0, 4)
+
+	local ContentArea = Instance.new("Frame", Main)
+	ContentArea.Name = "Content"
+	ContentArea.Position = UDim2.new(0, 135, 0, 0)
+	ContentArea.Size = UDim2.new(1, -135, 1, 0)
+	ContentArea.BackgroundTransparency = 1
+	
+	-- Close X Button im Main Frame
+	local CloseX = Instance.new("TextButton", ContentArea)
+	CloseX.Size = UDim2.new(0, 30, 0, 30)
+	CloseX.Position = UDim2.new(1, -35, 0, 5)
+	CloseX.Text = "X"
+	CloseX.Font = Theme.Font
+	CloseX.TextColor3 = Theme.Muted
+	CloseX.BackgroundTransparency = 1
+	CloseX.TextSize = 14
+	CloseX.MouseButton1Click:Connect(function() Main.Visible = false end)
+
+	MakeDraggable(Main, Sidebar) -- Verschieben am Sidebar
+
+	local Tabs = {}
+	local First = true
+
+	function Window:CreateTab(name)
+		local Tab = {}
+		
+		local Btn = Instance.new("TextButton", TabContainer)
+		Btn.Size = UDim2.new(1, -10, 0, 32)
+		Btn.Position = UDim2.new(0, 5, 0, 0)
+		Btn.BackgroundTransparency = 1
+		Btn.Text = "  " .. name
+		Btn.TextColor3 = Theme.Muted
+		Btn.Font = Theme.Font
+		Btn.TextSize = 12
+		Btn.TextXAlignment = Enum.TextXAlignment.Left
+		Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 4)
+
+		local Page = Instance.new("ScrollingFrame", ContentArea)
+		Page.Size = UDim2.new(1, -10, 1, -40)
+		Page.Position = UDim2.new(0, 0, 0, 40)
+		Page.BackgroundTransparency = 1
+		Page.BorderSizePixel = 0
+		Page.ScrollBarThickness = 2
+		Page.Visible = false
+		Page.CanvasSize = UDim2.new(0,0,0,0)
+		
+		local PageLayout = Instance.new("UIListLayout", Page)
+		PageLayout.Padding = UDim.new(0, 6)
+		PageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+			Page.CanvasSize = UDim2.new(0, 0, 0, PageLayout.AbsoluteContentSize.Y + 20)
+		end)
+
+		function Tab:Activate()
+			for _, t in pairs(Tabs) do
+				t.Page.Visible = false
+				t.Btn.TextColor3 = Theme.Muted
+				t.Btn.BackgroundTransparency = 1
+			end
+			Page.Visible = true
+			Btn.TextColor3 = Theme.Main
+			Btn.BackgroundTransparency = 0
+			Btn.BackgroundColor3 = Theme.Accent
+		end
+
+		Btn.MouseButton1Click:Connect(function() Tab:Activate() end)
+		
+		table.insert(Tabs, {Btn = Btn, Page = Page})
+		
+		if First then 
+			Tab:Activate()
+			First = false 
+		end
+
+		function Tab:Toggle(text, default, callback)
+			local ToggleObj = {}
+			local state = default or false
+			
+			local Wrapper = Instance.new("Frame", Page)
+			Wrapper.Size = UDim2.new(1, 0, 0, 38) -- Größer für Touch
+			Wrapper.BackgroundColor3 = Theme.Element
+			Wrapper.ClipsDescendants = true
+			Instance.new("UICorner", Wrapper).CornerRadius = UDim.new(0, 4)
+			
+			local Label = Instance.new("TextLabel", Wrapper)
+			Label.Text = text
+			Label.Size = UDim2.new(1, -50, 0, 38)
+			Label.Position = UDim2.new(0, 10, 0, 0)
+			Label.BackgroundTransparency = 1
+			Label.Font = Theme.Font
+			Label.TextSize = 12
+			Label.TextColor3 = Theme.Muted
+			Label.TextXAlignment = Enum.TextXAlignment.Left
+
+			local Status = Instance.new("Frame", Wrapper)
+			Status.Size = UDim2.new(0, 10, 0, 10)
+			Status.Position = UDim2.new(0, 12, 0.5, -5) -- Linksindikator
+			Status.BackgroundColor3 = state and Theme.Accent or Theme.Muted
+			Instance.new("UICorner", Status).CornerRadius = UDim.new(1,0)
+			
+			Label.Position = UDim2.new(0, 30, 0, 0)
+
+			local Clicker = Instance.new("TextButton", Wrapper)
+			Clicker.Size = UDim2.new(1, 0, 1, 0)
+			Clicker.BackgroundTransparency = 1
+			Clicker.Text = ""
+			
+			Clicker.MouseButton1Click:Connect(function() 
+				state = not state
+				Tween(Status, {BackgroundColor3 = state and Theme.Accent or Theme.Muted})
+				Tween(Label, {TextColor3 = state and Theme.Text or Theme.Muted})
+				pcall(callback, state)
+			end)
+			
+			-- Initial State
+			if state then 
+				Status.BackgroundColor3 = Theme.Accent
+				Label.TextColor3 = Theme.Text
+			end
+
+			function ToggleObj:AddSlider(info)
+				-- Slider Implementierung hier (vereinfacht für mobile platz)
+			end
+			return ToggleObj
+		end
+		return Tab
+	end
+	return Window
+end
+
+return PandazWare
