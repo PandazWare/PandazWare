@@ -1,0 +1,140 @@
+local NotificationLibrary = {}
+local TweenService = game:GetService("TweenService")
+local TextService = game:GetService("TextService")
+
+local function getSafeParent()
+    if gethui then
+        return gethui()
+    elseif game:GetService("CoreGui") then
+        return game:GetService("CoreGui")
+    else
+        return game.Players.LocalPlayer:WaitForChild("PlayerGui")
+    end
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DeltaNotifications"
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = getSafeParent()
+
+local Container = Instance.new("Frame")
+Container.Name = "NotificationContainer"
+Container.Parent = ScreenGui
+Container.BackgroundTransparency = 1
+Container.Position = UDim2.new(0.5, -125, 0.05, 0) 
+Container.Size = UDim2.new(0, 250, 0.8, 0) 
+Container.ClipsDescendants = false
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = Container
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 8)
+UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+
+function NotificationLibrary.Notify(title, text, duration)
+    title = title or "Notification"
+    text = text or "Empty"
+    duration = duration or 3
+
+    local Frame = Instance.new("Frame")
+    Frame.Name = "NotifFrame"
+    Frame.Parent = Container
+    Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35) 
+    Frame.BorderSizePixel = 0
+    Frame.Size = UDim2.new(1, 0, 0, 0) 
+    Frame.BackgroundTransparency = 1
+    Frame.ClipsDescendants = true
+
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0, 10)
+    UICorner.Parent = Frame
+
+    local UIStroke = Instance.new("UIStroke")
+    UIStroke.Parent = Frame
+    UIStroke.Color = Color3.fromRGB(80, 80, 80)
+    UIStroke.Thickness = 1.5
+    UIStroke.Transparency = 1
+
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Name = "Title"
+    TitleLabel.Parent = Frame
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Position = UDim2.new(0.05, 0, 0, 5)
+    TitleLabel.Size = UDim2.new(0.9, 0, 0, 20)
+    TitleLabel.Font = Enum.Font.GothamBold
+    TitleLabel.Text = title
+    TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TitleLabel.TextSize = 14
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.TextTransparency = 1
+
+    local DescLabel = Instance.new("TextLabel")
+    DescLabel.Name = "Description"
+    DescLabel.Parent = Frame
+    DescLabel.BackgroundTransparency = 1
+    DescLabel.Position = UDim2.new(0.05, 0, 0, 25)
+    DescLabel.Size = UDim2.new(0.9, 0, 1, -30)
+    DescLabel.Font = Enum.Font.Gotham
+    DescLabel.Text = text
+    DescLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    DescLabel.TextSize = 12
+    DescLabel.TextWrapped = true
+    DescLabel.TextXAlignment = Enum.TextXAlignment.Left
+    DescLabel.TextYAlignment = Enum.TextYAlignment.Top
+    DescLabel.TextTransparency = 1
+
+    local textBounds = TextService:GetTextSize(text, 12, Enum.Font.Gotham, Vector2.new(225, 1000))
+    local targetHeight = math.clamp(textBounds.Y + 35, 50, 150)
+
+    local openInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    
+    TweenService:Create(Frame, openInfo, {
+        Size = UDim2.new(1, 0, 0, targetHeight),
+        BackgroundTransparency = 0.1
+    }):Play()
+    
+    TweenService:Create(UIStroke, openInfo, {Transparency = 0}):Play()
+    
+    task.spawn(function()
+        task.wait(0.1)
+        TweenService:Create(TitleLabel, openInfo, {TextTransparency = 0}):Play()
+        TweenService:Create(DescLabel, openInfo, {TextTransparency = 0}):Play()
+    end)
+
+    local ProgressBar = Instance.new("Frame")
+    ProgressBar.Parent = Frame
+    ProgressBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ProgressBar.BorderSizePixel = 0
+    ProgressBar.Position = UDim2.new(0, 0, 1, -2)
+    ProgressBar.Size = UDim2.new(0, 0, 0, 2)
+    
+    TweenService:Create(ProgressBar, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(1,0,0,2)}):Play()
+
+    task.delay(duration, function()
+        if not Frame then return end
+        local closeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+        
+        TweenService:Create(TitleLabel, closeInfo, {TextTransparency = 1}):Play()
+        TweenService:Create(DescLabel, closeInfo, {TextTransparency = 1}):Play()
+        TweenService:Create(UIStroke, closeInfo, {Transparency = 1}):Play()
+        
+        local closeTween = TweenService:Create(Frame, closeInfo, {
+            Size = UDim2.new(1, 0, 0, 0),
+            BackgroundTransparency = 1
+        })
+        closeTween:Play()
+        
+        closeTween.Completed:Connect(function()
+            Frame:Destroy()
+        end)
+    end)
+end
+
+NotificationLibrary.Notify("Delta Exec", "Script loaded successfully", 3)
+task.wait(0.5)
+NotificationLibrary.Notify("Info", "thats very 🔥 (upper mid and stacking).", 4)
+task.wait(1)
+NotificationLibrary.Notify("Long Text", "jdjsmdhsmsnd. Test test testjdndndnsns", 6)
+
+return NotificationLibrary
