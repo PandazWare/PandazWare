@@ -1,0 +1,554 @@
+-- // PANDAZWARE COMPLETE // --
+-- Merged Library + Added Slider Support + All Features
+
+getgenv().SecureMode = true
+
+-- [ SERVICES ]
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local TextService = game:GetService("TextService")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- [ LIBRARY START (Patched) ]
+local PandazWare = {}
+PandazWare.Version = "1.3 Fixed"
+
+local Theme = {
+    Main = Color3.fromRGB(15, 15, 15),       
+    Sidebar = Color3.fromRGB(20, 20, 20),    
+    Element = Color3.fromRGB(25, 25, 30),    
+    Stroke = Color3.fromRGB(40, 40, 40),     
+    Accent = Color3.fromRGB(0, 255, 170), -- Panda Toxic Green
+    Text = Color3.fromRGB(230, 230, 230),
+    Muted = Color3.fromRGB(100, 100, 100),
+    Font = Enum.Font.GothamBold,
+}
+
+local function getSafeParent()
+    if gethui then return gethui()
+    elseif game:GetService("CoreGui") then return game:GetService("CoreGui")
+    else return LocalPlayer:WaitForChild("PlayerGui") end
+end
+
+-- Cleanup Old UI
+for _, v in pairs(getSafeParent():GetChildren()) do
+    if v.Name == "PandazWare" then v:Destroy() end
+end
+
+local GUI = Instance.new("ScreenGui")
+GUI.Name = "PandazWare"
+GUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+GUI.ResetOnSpawn = false
+GUI.IgnoreGuiInset = true
+GUI.Parent = getSafeParent()
+
+-- Notifications
+local NotifContainer = Instance.new("Frame", GUI)
+NotifContainer.Name = "NotificationContainer"
+NotifContainer.BackgroundTransparency = 1
+NotifContainer.Position = UDim2.new(0.5, -125, 0.05, 0)
+NotifContainer.Size = UDim2.new(0, 250, 0.8, 0)
+NotifContainer.ClipsDescendants = false
+
+local NotifList = Instance.new("UIListLayout", NotifContainer)
+NotifList.SortOrder = Enum.SortOrder.LayoutOrder
+NotifList.Padding = UDim.new(0, 8)
+NotifList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+NotifList.VerticalAlignment = Enum.VerticalAlignment.Top
+
+function PandazWare:Notify(title, text, duration)
+    title = title or "PandazWare"
+    text = text or "Notification"
+    duration = duration or 3
+
+    local Frame = Instance.new("Frame", NotifContainer)
+    Frame.BackgroundColor3 = Theme.Main
+    Frame.BorderSizePixel = 0
+    Frame.Size = UDim2.new(1, 0, 0, 0) 
+    Frame.BackgroundTransparency = 1
+    Frame.ClipsDescendants = true
+
+    local UICorner = Instance.new("UICorner", Frame)
+    UICorner.CornerRadius = UDim.new(0, 6)
+    local UIStroke = Instance.new("UIStroke", Frame)
+    UIStroke.Color = Theme.Stroke
+    UIStroke.Thickness = 1.5
+    UIStroke.Transparency = 1
+
+    local TitleLabel = Instance.new("TextLabel", Frame)
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Position = UDim2.new(0.05, 0, 0, 5)
+    TitleLabel.Size = UDim2.new(0.9, 0, 0, 20)
+    TitleLabel.Font = Theme.Font
+    TitleLabel.Text = title
+    TitleLabel.TextColor3 = Theme.Accent
+    TitleLabel.TextSize = 14
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.TextTransparency = 1
+
+    local DescLabel = Instance.new("TextLabel", Frame)
+    DescLabel.BackgroundTransparency = 1
+    DescLabel.Position = UDim2.new(0.05, 0, 0, 25)
+    DescLabel.Size = UDim2.new(0.9, 0, 1, -30)
+    DescLabel.Font = Enum.Font.Gotham
+    DescLabel.Text = text
+    DescLabel.TextColor3 = Theme.Text
+    DescLabel.TextSize = 12
+    DescLabel.TextWrapped = true
+    DescLabel.TextXAlignment = Enum.TextXAlignment.Left
+    DescLabel.TextYAlignment = Enum.TextYAlignment.Top
+    DescLabel.TextTransparency = 1
+
+    local textBounds = TextService:GetTextSize(text, 12, Enum.Font.Gotham, Vector2.new(225, 1000))
+    local targetHeight = math.clamp(textBounds.Y + 35, 50, 150)
+    local openInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    
+    TweenService:Create(Frame, openInfo, {Size = UDim2.new(1, 0, 0, targetHeight), BackgroundTransparency = 0.1}):Play()
+    TweenService:Create(UIStroke, openInfo, {Transparency = 0}):Play()
+    
+    task.spawn(function()
+        task.wait(0.1)
+        TweenService:Create(TitleLabel, openInfo, {TextTransparency = 0}):Play()
+        TweenService:Create(DescLabel, openInfo, {TextTransparency = 0}):Play()
+    end)
+
+    local ProgressBar = Instance.new("Frame", Frame)
+    ProgressBar.BackgroundColor3 = Theme.Accent
+    ProgressBar.BorderSizePixel = 0
+    ProgressBar.Position = UDim2.new(0, 0, 1, -2)
+    ProgressBar.Size = UDim2.new(0, 0, 0, 2)
+    TweenService:Create(ProgressBar, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(1,0,0,2)}):Play()
+
+    task.delay(duration, function()
+        if not Frame then return end
+        local closeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+        TweenService:Create(TitleLabel, closeInfo, {TextTransparency = 1}):Play()
+        TweenService:Create(DescLabel, closeInfo, {TextTransparency = 1}):Play()
+        TweenService:Create(UIStroke, closeInfo, {Transparency = 1}):Play()
+        local closeTween = TweenService:Create(Frame, closeInfo, {Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1})
+        closeTween:Play()
+        closeTween.Completed:Connect(function() Frame:Destroy() end)
+    end)
+end
+
+local function MakeDraggable(gui, trigger)
+    local dragging, dragInput, dragStart, startPos
+    local t = trigger or gui
+    t.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; dragStart = input.Position; startPos = gui.Position
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+        end
+    end)
+    t.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+function PandazWare:CreateWindow(info)
+    local Window = {}
+local ToggleBtn = Instance.new("TextButton", GUI)
+    ToggleBtn.Name = "MobileToggle"
+    ToggleBtn.Size = UDim2.new(0, 50, 0, 50)
+    ToggleBtn.Position = UDim2.new(0.02, 0, 0.2, 0)
+    ToggleBtn.BackgroundColor3 = Theme.Main
+    ToggleBtn.Text = "P"
+    ToggleBtn.TextColor3 = Theme.Accent
+    ToggleBtn.Font = Theme.Font
+    ToggleBtn.TextSize = 24
+    Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(1, 0)
+    Instance.new("UIStroke", ToggleBtn).Color = Theme.Accent
+    MakeDraggable(ToggleBtn)
+
+    local Main = Instance.new("Frame", GUI)
+    Main.Name = "MainFrame"
+    Main.Size = UDim2.new(0, 480, 0, 280)
+    Main.Position = UDim2.new(0.5, -240, 0.5, -140)
+    Main.BackgroundColor3 = Theme.Main
+    Main.Visible = true
+    Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 6)
+    Instance.new("UIStroke", Main).Color = Theme.Stroke
+    
+    ToggleBtn.MouseButton1Click:Connect(function() Main.Visible = not Main.Visible end)
+    
+    local Sidebar = Instance.new("Frame", Main)
+    Sidebar.Name = "Sidebar"
+    Sidebar.Size = UDim2.new(0, 130, 1, 0)
+    Sidebar.BackgroundColor3 = Theme.Sidebar
+    Sidebar.BorderSizePixel = 0
+    Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 6)
+    
+    local Title = Instance.new("TextLabel", Sidebar)
+    Title.Text = (info.Title or "PandazWare")
+    Title.Size = UDim2.new(1, -10, 0, 40)
+    Title.Position = UDim2.new(0, 10, 0, 5)
+    Title.BackgroundTransparency = 1
+    Title.TextColor3 = Theme.Accent
+    Title.Font = Theme.Font
+    Title.TextSize = 14
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local TabContainer = Instance.new("ScrollingFrame", Sidebar)
+    TabContainer.Position = UDim2.new(0, 0, 0, 50)
+    TabContainer.Size = UDim2.new(1, 0, 1, -50)
+    TabContainer.BackgroundTransparency = 1
+    TabContainer.BorderSizePixel = 0
+    TabContainer.ScrollBarThickness = 0
+    Instance.new("UIListLayout", TabContainer).Padding = UDim.new(0, 4)
+
+    local ContentArea = Instance.new("Frame", Main)
+    ContentArea.Position = UDim2.new(0, 135, 0, 0)
+    ContentArea.Size = UDim2.new(1, -135, 1, 0)
+    ContentArea.BackgroundTransparency = 1
+    
+    local CloseX = Instance.new("TextButton", ContentArea)
+    CloseX.Size = UDim2.new(0, 30, 0, 30)
+    CloseX.Position = UDim2.new(1, -35, 0, 5)
+    CloseX.Text = "X"
+    CloseX.Font = Theme.Font
+    CloseX.TextColor3 = Theme.Muted
+    CloseX.BackgroundTransparency = 1
+    CloseX.TextSize = 14
+    CloseX.MouseButton1Click:Connect(function() 
+        Main.Visible = false 
+        PandazWare:Notify("Minimized", "Click the P button to open", 2)
+    end)
+
+    MakeDraggable(Main, Sidebar)
+
+    local Tabs = {}
+    local First = true
+
+    function Window:CreateTab(name)
+        local Tab = {}
+        
+        local Btn = Instance.new("TextButton", TabContainer)
+        Btn.Size = UDim2.new(1, -10, 0, 32)
+        Btn.BackgroundTransparency = 1
+        Btn.Text = "  " .. name
+        Btn.TextColor3 = Theme.Muted
+        Btn.Font = Theme.Font
+        Btn.TextSize = 12
+        Btn.TextXAlignment = Enum.TextXAlignment.Left
+        Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 4)
+
+        local Page = Instance.new("ScrollingFrame", ContentArea)
+        Page.Size = UDim2.new(1, -10, 1, -40)
+        Page.Position = UDim2.new(0, 0, 0, 40)
+        Page.BackgroundTransparency = 1
+        Page.BorderSizePixel = 0
+        Page.ScrollBarThickness = 2
+        Page.Visible = false
+        Page.CanvasSize = UDim2.new(0,0,0,0)
+        Page.AutomaticCanvasSize = Enum.AutomaticSize.Y -- Scrolling fix
+        
+        local PageLayout = Instance.new("UIListLayout", Page)
+        PageLayout.Padding = UDim.new(0, 6)
+
+        function Tab:Activate()
+            for _, t in pairs(Tabs) do
+                t.Page.Visible = false
+                t.Btn.TextColor3 = Theme.Muted
+                t.Btn.BackgroundTransparency = 1
+            end
+            Page.Visible = true
+            Btn.TextColor3 = Theme.Main
+            Btn.BackgroundTransparency = 0
+            Btn.BackgroundColor3 = Theme.Accent
+        end
+        Btn.MouseButton1Click:Connect(function() Tab:Activate() end)
+        table.insert(Tabs, {Btn = Btn, Page = Page})
+        if First then Tab:Activate(); First = false end
+
+        -- TOGGLE
+        function Tab:Toggle(text, default, callback)
+            local state = default or false
+            local Wrapper = Instance.new("Frame", Page)
+            Wrapper.Size = UDim2.new(1, 0, 0, 38)
+            Wrapper.BackgroundColor3 = Theme.Element
+            Instance.new("UICorner", Wrapper).CornerRadius = UDim.new(0, 4)
+            local Label = Instance.new("TextLabel", Wrapper)
+            Label.Text = text; Label.Size = UDim2.new(1, -50, 0, 38); Label.Position = UDim2.new(0, 10, 0, 0)
+            Label.BackgroundTransparency = 1; Label.Font = Theme.Font; Label.TextSize = 12; Label.TextColor3 = state and Theme.Text or Theme.Muted; Label.TextXAlignment = Enum.TextXAlignment.Left
+            local Status = Instance.new("Frame", Wrapper)
+            Status.Size = UDim2.new(0, 10, 0, 10); Status.Position = UDim2.new(0, 12, 0.5, -5)
+            Status.BackgroundColor3 = state and Theme.Accent or Theme.Muted; Instance.new("UICorner", Status).CornerRadius = UDim.new(1,0)
+            Label.Position = UDim2.new(0, 30, 0, 0)
+            local Clicker = Instance.new("TextButton", Wrapper)
+            Clicker.Size = UDim2.new(1, 0, 1, 0); Clicker.BackgroundTransparency = 1; Clicker.Text = ""
+            Clicker.MouseButton1Click:Connect(function() 
+                state = not state
+                TweenService:Create(Status, TweenInfo.new(0.2), {BackgroundColor3 = state and Theme.Accent or Theme.Muted}):Play()
+                TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = state and Theme.Text or Theme.Muted}):Play()
+                pcall(callback, state)
+            end)
+            if state then pcall(callback, state) end
+        end
+
+        -- SLIDER (NEU HINZUGEFÜGT!)
+        function Tab:Slider(text, min, max, default, callback)
+            local val = default or min
+            local Wrapper = Instance.new("Frame", Page)
+            Wrapper.Size = UDim2.new(1, 0, 0, 50)
+            Wrapper.BackgroundColor3 = Theme.Element
+            Instance.new("UICorner", Wrapper).CornerRadius = UDim.new(0, 4)
+local Label = Instance.new("TextLabel", Wrapper)
+            Label.Text = text .. ": " .. val
+            Label.Size = UDim2.new(1, 0, 0, 20)
+            Label.Position = UDim2.new(0, 10, 0, 5)
+            Label.BackgroundTransparency = 1
+            Label.Font = Theme.Font
+            Label.TextSize = 12
+            Label.TextColor3 = Theme.Text
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+            
+            local SliderBar = Instance.new("TextButton", Wrapper)
+            SliderBar.Size = UDim2.new(1, -20, 0, 6)
+            SliderBar.Position = UDim2.new(0, 10, 0, 30)
+            SliderBar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            SliderBar.Text = ""
+            SliderBar.AutoButtonColor = false
+            Instance.new("UICorner", SliderBar).CornerRadius = UDim.new(1, 0)
+            
+            local Fill = Instance.new("Frame", SliderBar)
+            Fill.Size = UDim2.new((val - min) / (max - min), 0, 1, 0)
+            Fill.BackgroundColor3 = Theme.Accent
+            Instance.new("UICorner", Fill).CornerRadius = UDim.new(1, 0)
+            
+            local function Update(input)
+                local pos = math.clamp((input.Position.X - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1)
+                val = math.floor(min + ((max - min) * pos))
+                Fill.Size = UDim2.new(pos, 0, 1, 0)
+                Label.Text = text .. ": " .. val
+                pcall(callback, val)
+            end
+            
+            local dragging = false
+            SliderBar.InputBegan:Connect(function(i) 
+                if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true; Update(i) end 
+            end)
+            UserInputService.InputEnded:Connect(function(i) 
+                if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end 
+            end)
+            UserInputService.InputChanged:Connect(function(i) 
+                if dragging and (i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseMovement) then Update(i) end 
+            end)
+        end
+
+        return Tab
+    end
+    return Window
+end
+
+-- [ FLAGS & LOGIC ]
+local Flags = {
+    Aimbot = false, FOV = 100, Smooth = 0.5, WallCheck = true, HitChance = 100, ShowFOV = false,
+    SilentAim = false, Hitbox = false, HitboxSize = 4, Spinbot = false, SpinSpeed = 50,
+    ESP_Chams = false, ESP_Box = false, ESP_Skel = false, ESP_Trace = false, Fullbright = false, ClearMap = false,
+    NoRecoil = false, NoSpread = false, RapidFire = false, InfAmmo = false, InstaReload = false,
+    TP = false, TPDist = 12, Speed = false, SpeedVal = 16, Bhop = false
+}
+
+-- [ UI CONSTRUCTION ]
+local Window = PandazWare:CreateWindow({Title = "PandazWare"})
+
+-- LEGIT
+local Legit = Window:CreateTab("Legit")
+Legit:Toggle("Aimbot", false, function(v) Flags.Aimbot = v end)
+Legit:Slider("FOV Radius", 10, 400, 100, function(v) Flags.FOV = v end)
+Legit:Slider("Smoothness", 0, 10, 5, function(v) Flags.Smooth = v/10 end)
+Legit:Slider("Hit Chance %", 0, 100, 100, function(v) Flags.HitChance = v end)
+Legit:Toggle("Wall Check", true, function(v) Flags.WallCheck = v end)
+Legit:Toggle("Show FOV", false, function(v) Flags.ShowFOV = v end)
+
+-- RAGE
+local Rage = Window:CreateTab("Rage")
+Rage:Toggle("Silent Aim", false, function(v) Flags.SilentAim = v end)
+Rage:Toggle("Hitbox Extender", false, function(v) Flags.Hitbox = v end)
+Rage:Slider("Hitbox Size", 2, 15, 4, function(v) Flags.HitboxSize = v end)
+Rage:Toggle("Spinbot", false, function(v) Flags.Spinbot = v end)
+Rage:Slider("Spin Speed", 10, 100, 50, function(v) Flags.SpinSpeed = v end)
+
+-- VISUALS
+local Vis = Window:CreateTab("Visuals")
+Vis:Toggle("Chams", false, function(v) Flags.ESP_Chams = v end)
+Vis:Toggle("Box ESP", false, function(v) Flags.ESP_Box = v end)
+Vis:Toggle("Skeleton ESP", false, function(v) Flags.ESP_Skel = v end)
+Vis:Toggle("Tracers", false, function(v) Flags.ESP_Trace = v end)
+Vis:Toggle("Fullbright", false, function(v) Flags.Fullbright = v end)
+Vis:Toggle("Clear Map", false, function(v) Flags.ClearMap = v end)
+
+-- GUNS
+local Gun = Window:CreateTab("Gun Mods")
+Gun:Toggle("No Recoil", false, function(v) Flags.NoRecoil = v end)
+Gun:Toggle("No Spread", false, function(v) Flags.NoSpread = v end)
+Gun:Toggle("Rapid Fire", false, function(v) Flags.RapidFire = v end)
+Gun:Toggle("Infinite Ammo", false, function(v) Flags.InfAmmo = v end)
+Gun:Toggle("Instant Reload", false, function(v) Flags.InstaReload = v end)
+
+-- MISC
+local Misc = Window:CreateTab("Misc")
+Misc:Toggle("3rd Person", false, function(v) Flags.TP = v end)
+Misc:Slider("TP Distance", 5, 30, 12, function(v) Flags.TPDist = v end)
+Misc:Toggle("Speed Hack", false, function(v) Flags.Speed = v end)
+Misc:Slider("Speed", 16, 100, 25, function(v) Flags.SpeedVal = v end)
+Misc:Toggle("Auto Bhop", false, function(v) Flags.Bhop = v end)
+
+-- [ GAME LOGIC ]
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Color = Color3.fromRGB(0, 255, 170)
+FOVCircle.Thickness = 1.5; FOVCircle.NumSides = 60; FOVCircle.Visible = false; FOVCircle.Filled = false
+
+local DrawCache = {Skeleton = {}, Tracers = {}, Chams = {}}
+local SkeletonConnections = {{"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"}, {"Head", "Torso"}, {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"LeftLowerArm", "LeftHand"}, {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"RightLowerArm", "RightHand"}, {"Torso", "Left Arm"}, {"Torso", "Right Arm"}, {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LeftLowerLeg", "LeftFoot"}, {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}, {"RightLowerLeg", "RightFoot"}, {"Torso", "Left Leg"}, {"Torso", "Right Leg"}}
+
+local function UpdateSkeleton(plr)
+    if not DrawCache.Skeleton[plr] then DrawCache.Skeleton[plr] = {} end
+    local cache = DrawCache.Skeleton[plr]
+    if Flags.ESP_Skel and plr.Character and plr.Team ~= LocalPlayer.Team then
+        for i, pair in pairs(SkeletonConnections) do
+            local pA, pB = plr.Character:FindFirstChild(pair[1]), plr.Character:FindFirstChild(pair[2])
+            if pA and pB then
+                local line = cache[i] or Drawing.new("Line")
+                line.Thickness = 1.5; line.Color = Color3.fromRGB(255, 255, 255); line.Transparency = 1
+                cache[i] = line
+                local vA, visA = Camera:WorldToViewportPoint(pA.Position)
+                local vB, visB = Camera:WorldToViewportPoint(pB.Position)
+                if visA and visB then line.Visible = true; line.From = Vector2.new(vA.X, vA.Y); line.To = Vector2.new(vB.X, vB.Y) else line.Visible = false end
+            else if cache[i] then cache[i].Visible = false end end
+        end
+    else for _, l in pairs(cache) do l.Visible = false end end
+end
+
+local function UpdateChams(plr)
+    if not plr.Character then return end
+    if not Flags.ESP_Chams or plr.Team == LocalPlayer.Team then
+        if DrawCache.Chams[plr] then for _, v in pairs(DrawCache.Chams[plr]) do v:Destroy() end DrawCache.Chams[plr] = nil end
+        return
+    end
+    if not DrawCache.Chams[plr] then DrawCache.Chams[plr] = {} end
+    for _, part in pairs(plr.Character:GetChildren()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" and not DrawCache.Chams[plr][part] then
+            local cham = Instance.new("BoxHandleAdornment", part)
+            cham.Adornee = part; cham.Size = part.Size; cham.Color3 = Color3.fromRGB(0, 255, 170); cham.AlwaysOnTop = true; cham.ZIndex = 5; cham.Transparency = 0.5
+            DrawCache.Chams[plr][part] = cham
+        end
+    end
+end
+
+local function UpdateTracers(plr)
+    if not DrawCache.Tracers[plr] then local t = Drawing.new("Line"); t.Thickness = 1; t.Color = Color3.fromRGB(0, 255, 170); DrawCache.Tracers[plr] = t end
+    local line = DrawCache.Tracers[plr]
+    if Flags.ESP_Trace and plr.Character and plr.Team ~= LocalPlayer.Team and plr.Character:FindFirstChild("HumanoidRootPart") then
+        local vec, vis = Camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
+        if vis then line.Visible = true; line.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y); line.To = Vector2.new(vec.X, vec.Y) else line.Visible = false end
+    else line.Visible = false end
+end
+
+local function GetTarget()
+    local closest, maxDist = nil, Flags.FOV
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Team ~= LocalPlayer.Team and p.Character and p.Character:FindFirstChild("Head") and p.Character.Humanoid.Health > 0 then
+            local targetPart = p.Character.Head
+            if math.random(1, 100) > Flags.HitChance then targetPart = p.Character:FindFirstChild("UpperTorso") or p.Character.Head end
+            local pos, vis = Camera:WorldToViewportPoint(targetPart.Position)
+            if vis then
+                local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                if dist < maxDist then
+                    local isVisible = true
+                    if Flags.WallCheck then
+                        local ray = Ray.new(Camera.CFrame.Position, (targetPart.Position - Camera.CFrame.Position).Unit * 500)
+                        local hit = Workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character, Camera})
+                        if hit and not hit:IsDescendantOf(p.Character) then isVisible = false end
+                    end
+                    if isVisible then closest = targetPart; maxDist = dist end
+                end
+            end
+        end
+    end
+    return closest
+end
+local function ApplyGunMods()
+    local W = ReplicatedStorage:WaitForChild("Weapons")
+    for _, w in ipairs(W:GetChildren()) do
+        if Flags.RapidFire and w:FindFirstChild("FireRate") then w.FireRate.Value = 0 end
+        if Flags.NoSpread then
+             local s = w:FindFirstChild("Spread")
+             if s then if s:IsA("ValueBase") then s.Value = 0 end for _, c in ipairs(s:GetChildren()) do if c:IsA("NumberValue") then c.Value = 0 end end end
+        end
+        if Flags.NoRecoil then local r = w:FindFirstChild("Recoil") if r then for _, c in ipairs(r:GetChildren()) do if c:IsA("NumberValue") then c.Value = 0 end end end end
+        if Flags.InfAmmo then if w:FindFirstChild("Ammo") then w.Ammo.Value = 999 end if w:FindFirstChild("StoredAmmo") then w.StoredAmmo.Value = 9999 end end
+        if Flags.InstaReload and w:FindFirstChild("ReloadTime") then w.ReloadTime.Value = 0.05 end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    FOVCircle.Radius = Flags.FOV
+    FOVCircle.Visible = Flags.ShowFOV
+    
+    if Flags.Aimbot and not Flags.SilentAim then
+        local t = GetTarget()
+        if t then Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, t.Position), 1 - Flags.Smooth) end
+    elseif Flags.SilentAim then
+        local t = GetTarget()
+        if t then Camera.CFrame = CFrame.new(Camera.CFrame.Position, t.Position) end
+    end
+
+    if Flags.Spinbot and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(Flags.SpinSpeed), 0)
+    end
+    
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then UpdateSkeleton(p); UpdateTracers(p); UpdateChams(p) end
+    end
+end)
+
+local AdornmentCache = {}
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if Flags.NoRecoil or Flags.NoSpread or Flags.RapidFire or Flags.InfAmmo or Flags.InstaReload then ApplyGunMods() end
+        if Flags.ClearMap then if Debris then Debris:ClearAllChildren() end Lighting.FogEnd = 999999 end
+        if Flags.ESP_Box then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Team ~= LocalPlayer.Team and p.Character then
+                    if not AdornmentCache[p] then
+                        local b = Instance.new("BoxHandleAdornment", p.Character)
+                        b.Adornee = p.Character:FindFirstChild("HumanoidRootPart"); b.Size = Vector3.new(4,5,1); b.AlwaysOnTop = true; b.Transparency = 0.5; b.Color3 = Color3.fromRGB(0, 255, 170)
+                        AdornmentCache[p] = b
+                    end
+                end
+            end
+        else for i,v in pairs(AdornmentCache) do v:Destroy() end AdornmentCache = {} end
+        
+        if Flags.Hitbox then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Team ~= LocalPlayer.Team and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    p.Character.HumanoidRootPart.Size = Vector3.new(Flags.HitboxSize, Flags.HitboxSize, Flags.HitboxSize); p.Character.HumanoidRootPart.Transparency = 0.7; p.Character.HumanoidRootPart.CanCollide = false; p.Character.HumanoidRootPart.Color = Color3.fromRGB(255,0,0); p.Character.HumanoidRootPart.Material = Enum.Material.Neon
+                end
+            end
+        end
+        if Flags.Fullbright then Lighting.Brightness = 2; Lighting.ClockTime = 14 else Lighting.Brightness = 1 end
+        if Flags.Speed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid.WalkSpeed = Flags.SpeedVal end
+        if Flags.Bhop and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then if LocalPlayer.Character.Humanoid.MoveDirection.Magnitude > 0 and LocalPlayer.Character.Humanoid.FloorMaterial ~= Enum.Material.Air then LocalPlayer.Character.Humanoid.Jump = true end end
+        if Flags.TP then LocalPlayer.CameraMode = Enum.CameraMode.Classic; LocalPlayer.CameraMaxZoomDistance = Flags.TPDist; LocalPlayer.CameraMinZoomDistance = Flags.TPDist else LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson; LocalPlayer.CameraMaxZoomDistance = 0.5 end
+    end
+end)
+
+PandazWare:Notify("PandazWare", "All Features Loaded Successfully!", 3)
