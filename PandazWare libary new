@@ -1,5 +1,5 @@
 local PandazWare = {}
-PandazWare.Version = "2.0 Complete"
+PandazWare.Version = "PandazWare"
 
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -8,7 +8,7 @@ local TextService = game:GetService("TextService")
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 
--- Theme
+-- Theme Definition
 local Theme = {
 	Main = Color3.fromRGB(18, 18, 22),       
 	Sidebar = Color3.fromRGB(24, 24, 28),    
@@ -20,7 +20,7 @@ local Theme = {
 	Font = Enum.Font.GothamBold,
 }
 
--- Safe Parent
+-- Safe Parent (Executor Support)
 local function getSafeParent()
 	if gethui then return gethui()
 	elseif game:GetService("CoreGui") then return game:GetService("CoreGui")
@@ -40,7 +40,7 @@ GUI.ResetOnSpawn = false
 GUI.IgnoreGuiInset = true
 GUI.Parent = ParentTarget
 
--- Notify System
+-- Notification System
 local NotifContainer = Instance.new("Frame", GUI)
 NotifContainer.Name = "Notifications"
 NotifContainer.Position = UDim2.new(0.5, -125, 0.05, 0)
@@ -54,13 +54,13 @@ NotifList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 function PandazWare:Notify(title, text, duration)
 	local Frame = Instance.new("Frame", NotifContainer)
 	Frame.BackgroundColor3 = Theme.Main
-	Frame.Size = UDim2.new(1, 0, 0, 0) -- Start Size
+	Frame.Size = UDim2.new(1, 0, 0, 0)
 	Frame.ClipsDescendants = true
 	Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 6)
 	Instance.new("UIStroke", Frame).Color = Theme.Stroke
 	
 	local TTitle = Instance.new("TextLabel", Frame)
-	TTitle.Text = title or "Notification"
+	TTitle.Text = title or "PandazWare"
 	TTitle.Font = Theme.Font
 	TTitle.TextColor3 = Theme.Accent
 	TTitle.TextSize = 14
@@ -102,7 +102,7 @@ function PandazWare:Notify(title, text, duration)
 	end)
 end
 
--- Mobile Dragging
+-- Mobile Dragging Logic
 local function MakeDraggable(gui, trigger)
 	local dragging, dragStart, startPos
 	local t = trigger or gui
@@ -147,7 +147,7 @@ end)
 function PandazWare:CreateWindow(info)
 	local Window = {}
 	
-	-- Mobile Toggle Button
+	-- Mobile Button (Panda Icon)
 	local ToggleBtn = Instance.new("TextButton", GUI)
 	ToggleBtn.Name = "MobileButton"
 	ToggleBtn.Size = UDim2.new(0, 45, 0, 45)
@@ -191,7 +191,7 @@ function PandazWare:CreateWindow(info)
 	TabHolder.ScrollBarThickness = 0
 	Instance.new("UIListLayout", TabHolder).Padding = UDim.new(0,4)
 	
-	-- Content
+	-- Content Area
 	local Content = Instance.new("Frame", Main)
 	Content.Position = UDim2.new(0, 135, 0, 0)
 	Content.Size = UDim2.new(1, -135, 1, 0)
@@ -251,7 +251,7 @@ function PandazWare:CreateWindow(info)
 		table.insert(Tabs, {Btn = TabBtn, Page = Page})
 		if FirstTab then Activate(); FirstTab = false end
 		
-		-- COMPONENTS --
+		-- ELEMENTE --
 		
 		function Tab:Button(text, callback)
 			local BtnFrame = Instance.new("TextButton", Page)
@@ -389,7 +389,6 @@ function PandazWare:CreateWindow(info)
 			OptionList.Padding = UDim.new(0, 2)
 			OptionList.SortOrder = Enum.SortOrder.LayoutOrder
 			
-			-- Spacer for Header
 			local Spacer = Instance.new("Frame", Container)
 			Spacer.Size = UDim2.new(1,0,0,36)
 			Spacer.BackgroundTransparency = 1
