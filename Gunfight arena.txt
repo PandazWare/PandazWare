@@ -1,0 +1,527 @@
+--[[ 
+    PANDAZWARE MOBILE ULTIMATE - TEIL 1
+    Game: Gunfight Arena
+    Executor: Delta / Arceus / Codex
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+--------------------------------------------------------------------------------
+-- MOBILE TOGGLE BUTTON (Beweglich & Wichtig für Delta)
+--------------------------------------------------------------------------------
+local ToggleGui = Instance.new("ScreenGui")
+local ToggleBtn = Instance.new("TextButton")
+local UICorner = Instance.new("UICorner")
+local UIStroke = Instance.new("UIStroke")
+
+-- Safe Parent Check (verhindert Fehler bei verschiedenen Executors)
+local function getSafeGuiRoot()
+    if gethui then return gethui() end
+    if game:GetService("CoreGui") then return game:GetService("CoreGui") end
+    return LocalPlayer:WaitForChild("PlayerGui")
+end
+
+local guiRoot = getSafeGuiRoot()
+
+-- Bereinige altes GUI falls vorhanden
+for _, v in pairs(guiRoot:GetChildren()) do
+    if v.Name == "PandazToggle" or v.Name == "PandazWareMain" then v:Destroy() end
+end
+
+ToggleGui.Name = "PandazToggle"
+ToggleGui.Parent = guiRoot
+ToggleGui.ResetOnSpawn = false
+ToggleGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+ToggleBtn.Name = "OpenBtn"
+ToggleBtn.Parent = ToggleGui
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+ToggleBtn.Position = UDim2.new(0.05, 0, 0.15, 0) -- Startposition oben links
+ToggleBtn.Size = UDim2.new(0, 55, 0, 55)
+ToggleBtn.Font = Enum.Font.GothamBlack
+ToggleBtn.Text = "P"
+ToggleBtn.TextColor3 = Color3.fromRGB(0, 255, 170) -- Panda Grün
+ToggleBtn.TextSize = 28.000
+ToggleBtn.Draggable = true -- WICHTIG: Damit du den Button verschieben kannst
+ToggleBtn.AutoButtonColor = true
+
+UICorner.CornerRadius = UDim.new(0, 14)
+UICorner.Parent = ToggleBtn
+
+UIStroke.Parent = ToggleBtn
+UIStroke.Color = Color3.fromRGB(0, 255, 170)
+UIStroke.Thickness = 2
+UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+-- Variable für UI Status
+local isUiOpen = true
+
+--------------------------------------------------------------------------------
+-- EMBEDDED LIBRARY (Optimiert für Mobile Touch)
+--------------------------------------------------------------------------------
+local Library = {}
+
+function Library:Create()
+    local GUI = Instance.new("ScreenGui")
+    GUI.Name = "PandazWareMain"
+    GUI.Parent = guiRoot
+    GUI.ResetOnSpawn = false
+    
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 500, 0, 320) -- Optimierte Größe für Mobile Landscape
+    MainFrame.Position = UDim2.new(0.5, -250, 0.5, -160)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.ClipsDescendants = true
+    MainFrame.Parent = GUI
+    MainFrame.Visible = isUiOpen -- Status vom Toggle Button
+    
+    -- Design Elemente
+    local MainCorner = Instance.new("UICorner")
+    MainCorner.CornerRadius = UDim.new(0, 12)
+    MainCorner.Parent = MainFrame
+
+    local MainStroke = Instance.new("UIStroke")
+    MainStroke.Parent = MainFrame
+    MainStroke.Color = Color3.fromRGB(40, 40, 45)
+    MainStroke.Thickness = 1
+    
+    -- Verbinde Toggle Button
+    ToggleBtn.MouseButton1Click:Connect(function()
+        isUiOpen = not isUiOpen
+        MainFrame.Visible = isUiOpen
+    end)
+    
+    -- Sidebar (Tabs)
+    local Sidebar = Instance.new("Frame")
+    Sidebar.Name = "Sidebar"
+    Sidebar.Parent = MainFrame
+    Sidebar.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    Sidebar.Size = UDim2.new(0, 130, 1, 0)
+    Sidebar.BorderSizePixel = 0
+    
+    local SideCorner = Instance.new("UICorner")
+    SideCorner.CornerRadius = UDim.new(0, 12)
+    SideCorner.Parent = Sidebar
+    
+    -- Titel "PandazWare"
+    local Title = Instance.new("TextLabel")
+    Title.Parent = Sidebar
+    Title.Text = "PandazWare"
+    Title.TextColor3 = Color3.fromRGB(0, 255, 170)
+    Title.Font = Enum.Font.GothamBlack
+    Title.TextSize = 18
+    Title.Size = UDim2.new(1, 0, 0, 50)
+    Title.BackgroundTransparency = 1
+    
+    local Version = Instance.new("TextLabel")
+    Version.Parent = Sidebar
+    Version.Text = "vMobile"
+    Version.TextColor3 = Color3.fromRGB(100, 100, 100)
+    Version.Font = Enum.Font.GothamBold
+    Version.TextSize = 10
+    Version.Size = UDim2.new(1, 0, 0, 20)
+    Version.Position = UDim2.new(0,0,0,35)
+    Version.BackgroundTransparency = 1
+
+    -- Tab Container
+    local TabContainer = Instance.new("ScrollingFrame")
+    TabContainer.Parent = Sidebar
+    TabContainer.Position = UDim2.new(0, 10, 0, 70)
+    TabContainer.Size = UDim2.new(1, -20, 1, -80)
+    TabContainer.BackgroundTransparency = 1
+    TabContainer.ScrollBarThickness = 0
+    TabContainer.CanvasSize = UDim2.new(0,0,2,0)
+    
+    local TabList = Instance.new("UIListLayout")
+    TabList.Parent = TabContainer
+    TabList.SortOrder = Enum.SortOrder.LayoutOrder
+    TabList.Padding = UDim.new(0, 8)
+
+    -- Content Bereich
+    local ContentObj = Instance.new("Frame")
+    ContentObj.Name = "Content"
+    ContentObj.Parent = MainFrame
+    ContentObj.BackgroundTransparency = 1
+    ContentObj.Position = UDim2.new(0, 140, 0, 10)
+    ContentObj.Size = UDim2.new(1, -150, 1, -20)
+    
+    -- Dragging Logik für das Hauptfenster (Touch Support)
+    local dragging, dragInput, dragStart, startPos
+    local function update(input)
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+    
+    MainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    
+    MainFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            if dragging then update(input) end
+        end
+    end)
+
+    local WindowObj = {}
+    local FirstTab = true
+    
+    function WindowObj:Tab(name)
+        -- Tab Button erstellen
+        local TabBtn = Instance.new("TextButton")
+        TabBtn.Parent = TabContainer
+        TabBtn.Size = UDim2.new(1, 0, 0, 32)
+        TabBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+        TabBtn.Text = "  " .. name
+        TabBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+        TabBtn.Font = Enum.Font.GothamBold
+        TabBtn.TextSize = 13
+        TabBtn.TextXAlignment = Enum.TextXAlignment.Left
+        TabBtn.AutoButtonColor = false
+        
+        local TabCorner = Instance.new("UICorner")
+        TabCorner.CornerRadius = UDim.new(0, 6)
+        TabCorner.Parent = TabBtn
+        
+        -- Seite erstellen
+        local Page = Instance.new("ScrollingFrame")
+        Page.Name = name .. "_Page"
+        Page.Parent = ContentObj
+        Page.Size = UDim2.new(1, 0, 1, 0)
+        Page.BackgroundTransparency = 1
+        Page.Visible = false
+        Page.ScrollBarThickness = 2
+        Page.ScrollBarImageColor3 = Color3.fromRGB(50,50,50)
+        
+        local PageList = Instance.new("UIListLayout")
+        PageList.Parent = Page
+        PageList.SortOrder = Enum.SortOrder.LayoutOrder
+        PageList.Padding = UDim.new(0, 6)
+        
+        -- Wenn es der erste Tab ist, aktivieren
+        if FirstTab then
+            FirstTab = false
+            Page.Visible = true
+            TabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            TabBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+        end
+        
+        -- Tab Wechsel Logik
+        TabBtn.MouseButton1Click:Connect(function()
+            -- Reset alle Tabs
+            for _, v in pairs(ContentObj:GetChildren()) do v.Visible = false end
+            for _, v in pairs(TabContainer:GetChildren()) do
+                if v:IsA("TextButton") then
+                    TweenService:Create(v, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(25, 25, 30), TextColor3 = Color3.fromRGB(150, 150, 150)}):Play()
+                end
+            end
+            
+            -- Aktiviere diesen Tab
+            Page.Visible = true
+            TweenService:Create(TabBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(40, 40, 45), TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+        end)
+        
+        local TabObj = {}
+        
+        function TabObj:Section(text)
+            local SectionLabel = Instance.new("TextLabel")
+            SectionLabel.Parent = Page
+            SectionLabel.Text = "  " .. string.upper(text)
+            SectionLabel.Size = UDim2.new(1, 0, 0, 25)
+            SectionLabel.BackgroundTransparency = 1
+            SectionLabel.TextColor3 = Color3.fromRGB(80, 80, 80)
+            SectionLabel.Font = Enum.Font.GothamBlack
+            SectionLabel.TextSize = 10
+            SectionLabel.TextXAlignment = Enum.TextXAlignment.Left
+        end
+--[[ 
+    PANDAZWARE MOBILE ULTIMATE - TEIL 2
+    Füge dies direkt unter Teil 1 ein!
+]]
+
+        function TabObj:Toggle(text, default, callback)
+            local ToggleBtn = Instance.new("TextButton")
+            ToggleBtn.Parent = Page
+            ToggleBtn.Size = UDim2.new(1, 0, 0, 42)
+            ToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+            ToggleBtn.Text = ""
+            ToggleBtn.AutoButtonColor = false
+            
+            local TCorner = Instance.new("UICorner")
+            TCorner.CornerRadius = UDim.new(0, 6)
+            TCorner.Parent = ToggleBtn
+            
+            local Label = Instance.new("TextLabel", ToggleBtn)
+            Label.Text = text
+            Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+            Label.Font = Enum.Font.GothamSemibold
+            Label.TextSize = 13
+            Label.Size = UDim2.new(0.7, 0, 1, 0)
+            Label.Position = UDim2.new(0, 12, 0, 0)
+            Label.BackgroundTransparency = 1
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+            
+            local StatusContainer = Instance.new("Frame", ToggleBtn)
+            StatusContainer.Size = UDim2.new(0, 40, 0, 20)
+            StatusContainer.Position = UDim2.new(1, -50, 0.5, -10)
+            StatusContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+            Instance.new("UICorner", StatusContainer).CornerRadius = UDim.new(1, 0)
+            
+            local Circle = Instance.new("Frame", StatusContainer)
+            Circle.Size = UDim2.new(0, 16, 0, 16)
+            Circle.Position = UDim2.new(0, 2, 0.5, -8)
+            Circle.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+            Instance.new("UICorner", Circle).CornerRadius = UDim.new(1, 0)
+            
+            local toggled = default or false
+            
+            -- Initial Status
+            if toggled then
+                Circle.Position = UDim2.new(1, -18, 0.5, -8)
+                Circle.BackgroundColor3 = Color3.fromRGB(0, 255, 170)
+                StatusContainer.BackgroundColor3 = Color3.fromRGB(0, 50, 30)
+            end
+            
+            ToggleBtn.MouseButton1Click:Connect(function()
+                toggled = not toggled
+                if toggled then
+                    TweenService:Create(Circle, TweenInfo.new(0.2), {Position = UDim2.new(1, -18, 0.5, -8), BackgroundColor3 = Color3.fromRGB(0, 255, 170)}):Play()
+                    TweenService:Create(StatusContainer, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 50, 30)}):Play()
+                else
+                    TweenService:Create(Circle, TweenInfo.new(0.2), {Position = UDim2.new(0, 2, 0.5, -8), BackgroundColor3 = Color3.fromRGB(80, 80, 80)}):Play()
+                    TweenService:Create(StatusContainer, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(15, 15, 18)}):Play()
+                end
+                pcall(callback, toggled)
+            end)
+        end
+        
+        function TabObj:Button(text, callback)
+            local Btn = Instance.new("TextButton")
+            Btn.Parent = Page
+            Btn.Size = UDim2.new(1, 0, 0, 40)
+            Btn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+            Btn.Text = text
+            Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            Btn.Font = Enum.Font.GothamBold
+            Btn.TextSize = 13
+            Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+            
+            Btn.MouseButton1Click:Connect(function()
+                local old = Btn.BackgroundColor3
+                Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+                wait(0.1)
+                Btn.BackgroundColor3 = old
+                pcall(callback)
+            end)
+        end
+
+        function TabObj:Textbox(text, placeholder, callback)
+            local Container = Instance.new("Frame", Page)
+            Container.Size = UDim2.new(1, 0, 0, 45)
+            Container.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+            Instance.new("UICorner", Container).CornerRadius = UDim.new(0, 6)
+            
+            local Label = Instance.new("TextLabel", Container)
+            Label.Text = text
+            Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+            Label.Font = Enum.Font.GothamSemibold
+            Label.TextSize = 12
+            Label.Position = UDim2.new(0, 12, 0, 0)
+            Label.Size = UDim2.new(0.4, 0, 1, 0)
+            Label.BackgroundTransparency = 1
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+            
+            local Box = Instance.new("TextBox", Container)
+            Box.Size = UDim2.new(0.5, -10, 0.7, 0)
+            Box.Position = UDim2.new(0.5, 0, 0.15, 0)
+            Box.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+            Box.TextColor3 = Color3.fromRGB(0, 255, 170)
+            Box.PlaceholderText = placeholder
+            Box.Text = ""
+            Box.Font = Enum.Font.Gotham
+            Box.TextSize = 12
+            Instance.new("UICorner", Box).CornerRadius = UDim.new(0, 4)
+            
+            Box.FocusLost:Connect(function(enter)
+                if enter and Box.Text ~= "" then
+                    pcall(callback, Box.Text)
+                    Box.Text = "" -- Clear after use
+                end
+            end)
+        end
+
+        return TabObj
+    end
+    
+    return WindowObj
+end
+
+--------------------------------------------------------------------------------
+-- GAME LOGIC & SETTINGS
+--------------------------------------------------------------------------------
+local Settings = {
+    Aimbot = false,
+    AimPart = "Head",
+    TeamCheck = true,
+    ESP = false,
+    NoRecoil = false
+}
+
+-- [AIMBOT LOGIK] --
+local function GetTarget()
+    local target = nil
+    local dist = math.huge
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+            -- Team Check
+            if Settings.TeamCheck and v.Team == LocalPlayer.Team then continue end
+            
+            local part = v.Character:FindFirstChild(Settings.AimPart)
+            if part then
+                local pos, vis = Camera:WorldToViewportPoint(part.Position)
+                if vis then
+                    local mag = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if mag < dist and mag < 200 then -- 200 Pixel FOV
+                        dist = mag
+                        target = part
+                    end
+                end
+            end
+        end
+    end
+    return target
+end
+
+-- [ESP LOGIK (Optimiert für Mobile Highlight)] --
+local function UpdateESP()
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character then
+            local hasHighlight = v.Character:FindFirstChild("PandaESP")
+            
+            if Settings.ESP then
+                if not hasHighlight then
+                    local hl = Instance.new("Highlight")
+                    hl.Name = "PandaESP"
+                    hl.Parent = v.Character
+                    hl.FillColor = Color3.fromRGB(255, 50, 50)
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    hl.FillTransparency = 0.5
+                    hl.OutlineTransparency = 0
+                end
+            else
+                if hasHighlight then hasHighlight:Destroy() end
+            end
+        end
+    end
+end
+
+--------------------------------------------------------------------------------
+-- GUI ERSTELLUNG
+--------------------------------------------------------------------------------
+local Window = Library:Create()
+
+-- TAB 1: COMBAT
+local Combat = Window:Tab("Combat")
+Combat:Section("Aimbot")
+Combat:Toggle("Enable Aimbot (Camera Lock)", false, function(v) Settings.Aimbot = v end)
+Combat:Toggle("Team Check", true, function(v) Settings.TeamCheck = v end)
+
+Combat:Section("Vortex Mods")
+Combat:Toggle("No Recoil (Steadiness)", false, function(v) Settings.NoRecoil = v end)
+
+-- TAB 2: VISUALS
+local Visuals = Window:Tab("Visuals")
+Visuals:Section("ESP")
+Visuals:Toggle("Player Highlight", false, function(v) 
+    Settings.ESP = v
+    if not v then UpdateESP() end 
+end)
+Visuals:Button("Full Bright Mode", function()
+    Lighting.Brightness = 2
+    Lighting.ClockTime = 14
+    Lighting.FogEnd = 100000
+    Lighting.GlobalShadows = false
+end)
+
+-- TAB 3: WEAPONS (Daten aus raw.txt)
+local Weap = Window:Tab("Weapons")
+Weap:Section("Changer")
+Weap:Textbox("Weapon Name", "e.g. M4A1", function(text)
+    LocalPlayer:SetAttribute("Primary", text)
+    LocalPlayer:SetAttribute("Secondary", text)
+end)
+Weap:Textbox("Camo Name", "e.g. Gold", function(text)
+    LocalPlayer:SetAttribute("PrimaryCamo", text)
+    LocalPlayer:SetAttribute("SecondaryCamo", text)
+end)
+Weap:Button("Apply Changes (Needs Respawn)", function()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.Health = 0
+    end
+end)
+
+-- TAB 4: PLAYER
+local PlayerTab = Window:Tab("Player")
+PlayerTab:Section("Movement")
+PlayerTab:Textbox("Walk Speed", "16", function(v)
+    if LocalPlayer.Character then LocalPlayer.Character.Humanoid.WalkSpeed = tonumber(v) or 16 end
+end)
+PlayerTab:Textbox("Jump Power", "50", function(v)
+    if LocalPlayer.Character then LocalPlayer.Character.Humanoid.JumpPower = tonumber(v) or 50 end
+end)
+
+--------------------------------------------------------------------------------
+-- LOOPS (Hintergrundprozesse)
+--------------------------------------------------------------------------------
+
+-- Schneller Loop für Aimbot & Recoil
+RunService.RenderStepped:Connect(function()
+    if Settings.Aimbot then
+        local target = GetTarget()
+        if target then
+            TweenService:Create(Camera, TweenInfo.new(0.06), {CFrame = CFrame.new(Camera.CFrame.Position, target.Position)}):Play()
+        end
+    end
+    
+    if Settings.NoRecoil then
+        pcall(function()
+            -- Pfad aus deiner ersten Nachricht
+            if LocalPlayer.PlayerScripts.Vortex.Modifiers:FindFirstChild("Steadiness") then
+                LocalPlayer.PlayerScripts.Vortex.Modifiers.Steadiness.Value = 0
+            end
+        end)
+    end
+end)
+
+-- Langsamerer Loop für ESP Updates (Spart Akku)
+task.spawn(function()
+    while task.wait(1) do
+        if Settings.ESP then UpdateESP() end
+    end
+end)
+
+-- Start Benachrichtigung
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "PandazWare Mobile";
+    Text = "Loaded! Press P to toggle.";
+    Duration = 5;
+})
