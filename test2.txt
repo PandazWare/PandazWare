@@ -1,0 +1,736 @@
+--[[
+    PandazWare Arsenal All-in-One (Fixed & Standalone)
+    
+    Enthält:
+    1. [span_0](start_span)PandazWare UI Library[span_0](end_span)
+    2. [span_1](start_span)Arsenal Scripts (Aimbot, ESP, Mods)[span_1](end_span)
+]]
+
+-- ==================================================================
+-- 1. PANDAZWARE LIBRARY (Direkt integriert, kein Loadstring nötig)
+-- ==================================================================
+local PandazWare = {}
+PandazWare.Version = "PandazWare"
+
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TextService = game:GetService("TextService")
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+
+-- Theme Definition
+local Theme = {
+	Main = Color3.fromRGB(18, 18, 22),       
+	Sidebar = Color3.fromRGB(24, 24, 28),    
+	Element = Color3.fromRGB(32, 32, 38),    
+	Stroke = Color3.fromRGB(50, 50, 55),     
+	Accent = Color3.fromRGB(0, 255, 170), -- Panda Green
+	Text = Color3.fromRGB(240, 240, 240),
+	Muted = Color3.fromRGB(120, 120, 120),
+	Font = Enum.Font.GothamBold,
+}
+
+-- Safe Parent (Executor Support)
+local function getSafeParent()
+	if gethui then return gethui()
+	elseif game:GetService("CoreGui") then return game:GetService("CoreGui")
+	else return Player:WaitForChild("PlayerGui") end
+end
+
+-- GUI Init
+local ParentTarget = getSafeParent()
+for _, v in pairs(ParentTarget:GetChildren()) do
+	if v.Name == "PandazWare" then v:Destroy() end
+end
+
+local GUI = Instance.new("ScreenGui")
+GUI.Name = "PandazWare"
+GUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+GUI.ResetOnSpawn = false
+GUI.IgnoreGuiInset = true
+GUI.Parent = ParentTarget
+
+-- Notification System
+local NotifContainer = Instance.new("Frame", GUI)
+NotifContainer.Name = "Notifications"
+NotifContainer.Position = UDim2.new(0.5, -125, 0.05, 0)
+NotifContainer.Size = UDim2.new(0, 250, 0.8, 0)
+NotifContainer.BackgroundTransparency = 1
+local NotifList = Instance.new("UIListLayout", NotifContainer)
+NotifList.SortOrder = Enum.SortOrder.LayoutOrder
+NotifList.Padding = UDim.new(0, 8)
+NotifList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+function PandazWare:Notify(title, text, duration)
+	local Frame = Instance.new("Frame", NotifContainer)
+	Frame.BackgroundColor3 = Theme.Main
+	Frame.Size = UDim2.new(1, 0, 0, 0)
+	Frame.ClipsDescendants = true
+	Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 6)
+	Instance.new("UIStroke", Frame).Color = Theme.Stroke
+	
+	local TTitle = Instance.new("TextLabel", Frame)
+	TTitle.Text = title or "PandazWare"
+	TTitle.Font = Theme.Font
+	TTitle.TextColor3 = Theme.Accent
+	TTitle.TextSize = 14
+	TTitle.Position = UDim2.new(0.05, 0, 0, 5)
+	TTitle.Size = UDim2.new(0.9, 0, 0, 20)
+	TTitle.BackgroundTransparency = 1
+	TTitle.TextXAlignment = Enum.TextXAlignment.Left
+	
+	local TDesc = Instance.new("TextLabel", Frame)
+	TDesc.Text = text or ""
+	TDesc.Font = Enum.Font.Gotham
+	TDesc.TextColor3 = Theme.Text
+	TDesc.TextSize = 12
+	TDesc.Position = UDim2.new(0.05, 0, 0, 25)
+	TDesc.Size = UDim2.new(0.9, 0, 1, -30)
+	TDesc.BackgroundTransparency = 1
+	TDesc.TextXAlignment = Enum.TextXAlignment.Left
+	TDesc.TextYAlignment = Enum.TextYAlignment.Top
+	TDesc.TextWrapped = true
+
+	local bounds = TextService:GetTextSize(TDesc.Text, 12, Enum.Font.Gotham, Vector2.new(225, 1000))
+	local targetHeight = math.clamp(bounds.Y + 35, 50, 150)
+	
+	TweenService:Create(Frame, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {Size = UDim2.new(1,0,0,targetHeight)}):Play()
+	
+	local Bar = Instance.new("Frame", Frame)
+	Bar.BackgroundColor3 = Theme.Accent
+	Bar.BorderSizePixel = 0
+	Bar.Size = UDim2.new(0,0,0,2)
+	Bar.Position = UDim2.new(0,0,1,-2)
+	TweenService:Create(Bar, TweenInfo.new(duration or 3, Enum.EasingStyle.Linear), {Size = UDim2.new(1,0,0,2)}):Play()
+	
+	task.delay(duration or 3, function()
+		if Frame then
+			TweenService:Create(Frame, TweenInfo.new(0.4), {Size = UDim2.new(1,0,0,0), BackgroundTransparency = 1}):Play()
+			task.wait(0.4)
+			Frame:Destroy()
+		end
+	end)
+end
+
+-- Mobile Dragging Logic
+local function MakeDraggable(gui, trigger)
+	local dragging, dragStart, startPos
+	local t = trigger or gui
+	t.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = gui.Position
+			input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+		end
+	end)
+	t.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local delta = input.Position - dragStart
+			gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+end
+
+-- Watermark
+task.spawn(function()
+	local WM = Instance.new("Frame", GUI)
+	WM.Size = UDim2.new(0, 180, 0, 22)
+	WM.Position = UDim2.new(0.5, 0, 0.01, 0)
+	WM.AnchorPoint = Vector2.new(0.5, 0)
+	WM.BackgroundColor3 = Theme.Main
+	Instance.new("UICorner", WM).CornerRadius = UDim.new(0, 4)
+	Instance.new("UIStroke", WM).Color = Theme.Accent
+	local Lbl = Instance.new("TextLabel", WM)
+	Lbl.Size = UDim2.new(1,0,1,0)
+	Lbl.BackgroundTransparency = 1
+	Lbl.TextColor3 = Theme.Text
+	Lbl.Font = Theme.Font
+	Lbl.TextSize = 11
+	
+	while GUI.Parent do
+		Lbl.Text = "PandazWare | FPS: " .. math.floor(1/RunService.RenderStepped:Wait())
+		task.wait(0.5)
+	end
+end)
+
+function PandazWare:CreateWindow(info)
+	local Window = {}
+	
+	-- Mobile Button (Panda Icon)
+	local ToggleBtn = Instance.new("TextButton", GUI)
+	ToggleBtn.Name = "MobileButton"
+	ToggleBtn.Size = UDim2.new(0, 45, 0, 45)
+	ToggleBtn.Position = UDim2.new(0.02, 0, 0.2, 0)
+	ToggleBtn.BackgroundColor3 = Theme.Main
+	ToggleBtn.Text = "🐼"
+	ToggleBtn.TextSize = 20
+	Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(1, 0)
+	Instance.new("UIStroke", ToggleBtn).Color = Theme.Accent
+	MakeDraggable(ToggleBtn)
+	
+	local Main = Instance.new("Frame", GUI)
+	Main.Name = "Main"
+	Main.Size = UDim2.new(0, 500, 0, 300)
+	Main.Position = UDim2.new(0.5, -250, 0.5, -150)
+	Main.BackgroundColor3 = Theme.Main
+	Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 6)
+	Instance.new("UIStroke", Main).Color = Theme.Stroke
+	
+	ToggleBtn.MouseButton1Click:Connect(function() Main.Visible = not Main.Visible end)
+	
+	-- Sidebar
+	local Sidebar = Instance.new("Frame", Main)
+	Sidebar.Size = UDim2.new(0, 130, 1, 0)
+	Sidebar.BackgroundColor3 = Theme.Sidebar
+	Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 6)
+	local Title = Instance.new("TextLabel", Sidebar)
+	Title.Text = info.Title or "PandazWare"
+	Title.TextColor3 = Theme.Accent
+	Title.Font = Theme.Font
+	Title.TextSize = 14
+	Title.Size = UDim2.new(1, -10, 0, 40)
+	Title.Position = UDim2.new(0, 10, 0, 0)
+	Title.BackgroundTransparency = 1
+	Title.TextXAlignment = Enum.TextXAlignment.Left
+	
+	local TabHolder = Instance.new("ScrollingFrame", Sidebar)
+	TabHolder.Position = UDim2.new(0,0,0,45)
+	TabHolder.Size = UDim2.new(1,0,1,-45)
+	TabHolder.BackgroundTransparency = 1
+	TabHolder.ScrollBarThickness = 0
+	Instance.new("UIListLayout", TabHolder).Padding = UDim.new(0,4)
+	
+	-- Content Area
+	local Content = Instance.new("Frame", Main)
+	Content.Position = UDim2.new(0, 135, 0, 0)
+	Content.Size = UDim2.new(1, -135, 1, 0)
+	Content.BackgroundTransparency = 1
+	
+	local CloseBtn = Instance.new("TextButton", Content)
+	CloseBtn.Text = "X"
+	CloseBtn.TextColor3 = Theme.Muted
+	CloseBtn.BackgroundTransparency = 1
+	CloseBtn.Font = Theme.Font
+	CloseBtn.TextSize = 14
+	CloseBtn.Size = UDim2.new(0,30,0,30)
+	CloseBtn.Position = UDim2.new(1,-35,0,5)
+	CloseBtn.MouseButton1Click:Connect(function() 
+		Main.Visible = false;
+		PandazWare:Notify("Info", "Use the Panda Button to open", 2) 
+	end)
+	
+	MakeDraggable(Main, Sidebar)
+	
+	local Tabs = {}
+	local FirstTab = true
+	
+	function Window:CreateTab(name)
+		local Tab = {}
+		local TabBtn = Instance.new("TextButton", TabHolder)
+		TabBtn.Size = UDim2.new(1, -10, 0, 30)
+		TabBtn.BackgroundTransparency = 1
+		TabBtn.Text = "  " .. name
+		TabBtn.TextColor3 = Theme.Muted
+		TabBtn.Font = Theme.Font
+		TabBtn.TextSize = 12
+		TabBtn.TextXAlignment = Enum.TextXAlignment.Left
+		Instance.new("UICorner", TabBtn).CornerRadius = UDim.new(0, 4)
+		
+		local Page = Instance.new("ScrollingFrame", Content)
+		Page.Size = UDim2.new(1, -10, 1, -40)
+		Page.Position = UDim2.new(0,0,0,40)
+		Page.BackgroundTransparency = 1
+		Page.ScrollBarThickness = 2
+		Page.Visible = false
+		local PageList = Instance.new("UIListLayout", Page)
+		PageList.Padding = UDim.new(0, 6)
+		PageList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+			Page.CanvasSize = UDim2.new(0,0,0, PageList.AbsoluteContentSize.Y + 20)
+		end)
+		
+		local function Activate()
+			for _, t in pairs(Tabs) do
+				t.Page.Visible = false
+				t.Btn.TextColor3 = Theme.Muted
+				t.Btn.BackgroundTransparency = 1
+			end
+			Page.Visible = true
+			TabBtn.TextColor3 = Theme.Main
+			TabBtn.BackgroundColor3 = Theme.Accent
+			TabBtn.BackgroundTransparency = 0
+		end
+		TabBtn.MouseButton1Click:Connect(Activate)
+		table.insert(Tabs, {Btn = TabBtn, Page = Page})
+		if FirstTab then Activate(); FirstTab = false end
+		
+		function Tab:Button(text, callback)
+			local BtnFrame = Instance.new("TextButton", Page)
+			BtnFrame.Size = UDim2.new(1, 0, 0, 32)
+			BtnFrame.BackgroundColor3 = Theme.Element
+			BtnFrame.Text = text
+			BtnFrame.TextColor3 = Theme.Text
+			BtnFrame.Font = Theme.Font
+			BtnFrame.TextSize = 12
+			Instance.new("UICorner", BtnFrame).CornerRadius = UDim.new(0, 4)
+			
+			BtnFrame.MouseButton1Click:Connect(function()
+				TweenService:Create(BtnFrame, TweenInfo.new(0.1), {BackgroundColor3 = Theme.Stroke}):Play()
+				task.delay(0.1, function() TweenService:Create(BtnFrame, TweenInfo.new(0.1), {BackgroundColor3 = Theme.Element}):Play() end)
+				pcall(callback)
+			end)
+		end
+		
+		function Tab:Toggle(text, default, callback)
+			local state = default or false
+			local TFrame = Instance.new("TextButton", Page)
+			TFrame.Size = UDim2.new(1, 0, 0, 36)
+			TFrame.BackgroundColor3 = Theme.Element
+			TFrame.Text = ""
+			Instance.new("UICorner", TFrame).CornerRadius = UDim.new(0, 4)
+			
+			local TText = Instance.new("TextLabel", TFrame)
+			TText.Text = text
+			TText.TextColor3 = Theme.Muted
+			TText.Font = Theme.Font
+			TText.TextSize = 12
+			TText.Size = UDim2.new(1, -40, 1, 0)
+			TText.Position = UDim2.new(0, 10, 0, 0)
+			TText.BackgroundTransparency = 1
+			TText.TextXAlignment = Enum.TextXAlignment.Left
+			
+			local Status = Instance.new("Frame", TFrame)
+			Status.Size = UDim2.new(0, 10, 0, 10)
+			Status.Position = UDim2.new(1, -20, 0.5, -5)
+			Status.BackgroundColor3 = state and Theme.Accent or Theme.Muted
+			Instance.new("UICorner", Status).CornerRadius = UDim.new(1, 0)
+			
+			local function Update()
+				TweenService:Create(Status, TweenInfo.new(0.2), {BackgroundColor3 = state and Theme.Accent or Theme.Muted}):Play()
+				TweenService:Create(TText, TweenInfo.new(0.2), {TextColor3 = state and Theme.Text or Theme.Muted}):Play()
+				pcall(callback, state)
+			end
+			
+			TFrame.MouseButton1Click:Connect(function() state = not state; Update() end)
+			if default then Update() end
+		end
+		
+		function Tab:Slider(text, min, max, default, callback)
+			local val = default or min
+			local SFrame = Instance.new("Frame", Page)
+			SFrame.Size = UDim2.new(1, 0, 0, 45)
+			SFrame.BackgroundColor3 = Theme.Element
+			Instance.new("UICorner", SFrame).CornerRadius = UDim.new(0, 4)
+			
+			local SText = Instance.new("TextLabel", SFrame)
+			SText.Text = text .. ": " .. val
+			SText.TextColor3 = Theme.Text
+			SText.Font = Theme.Font
+			SText.TextSize = 12
+			SText.Size = UDim2.new(1, -20, 0, 20)
+			SText.Position = UDim2.new(0, 10, 0, 2)
+			SText.BackgroundTransparency = 1
+			SText.TextXAlignment = Enum.TextXAlignment.Left
+			
+			local Bar = Instance.new("TextButton", SFrame)
+			Bar.Size = UDim2.new(1, -20, 0, 6)
+			Bar.Position = UDim2.new(0, 10, 0, 28)
+			Bar.BackgroundColor3 = Theme.Main
+			Bar.Text = ""
+			Instance.new("UICorner", Bar).CornerRadius = UDim.new(1, 0)
+			
+			local Fill = Instance.new("Frame", Bar)
+			Fill.BackgroundColor3 = Theme.Accent
+			Fill.Size = UDim2.new((val - min) / (max - min), 0, 1, 0)
+			Instance.new("UICorner", Fill).CornerRadius = UDim.new(1, 0)
+			
+			local dragging = false
+			local function Update(input)
+				local p = math.clamp((input.Position.X - Bar.AbsolutePosition.X) / Bar.AbsoluteSize.X, 0, 1)
+				val = math.floor(min + ((max - min) * p))
+				SText.Text = text .. ": " .. val
+				TweenService:Create(Fill, TweenInfo.new(0.1), {Size = UDim2.new(p, 0, 1, 0)}):Play()
+				pcall(callback, val)
+			end
+			
+			Bar.InputBegan:Connect(function(i) 
+				if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = true; Update(i) end 
+			end)
+			UserInputService.InputEnded:Connect(function(i) 
+				if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = false end 
+			end)
+			UserInputService.InputChanged:Connect(function(i) 
+				if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then Update(i) end 
+			end)
+		end
+		
+		function Tab:Dropdown(text, options, default, callback)
+			local expanded = false
+			local selected = default or options[1]
+			local Container = Instance.new("Frame", Page)
+			Container.Size = UDim2.new(1, 0, 0, 36)
+			Container.BackgroundColor3 = Theme.Element
+			Container.ClipsDescendants = true
+			Instance.new("UICorner", Container).CornerRadius = UDim.new(0, 4)
+			
+			local Header = Instance.new("TextButton", Container)
+			Header.Size = UDim2.new(1, 0, 0, 36)
+			Header.BackgroundTransparency = 1
+			Header.Text = ""
+			
+			local Title = Instance.new("TextLabel", Header)
+			Title.Text = text .. ": " .. tostring(selected)
+			Title.TextColor3 = Theme.Text
+			Title.Font = Theme.Font
+			Title.TextSize = 12
+			Title.Position = UDim2.new(0, 10, 0, 0)
+			Title.Size = UDim2.new(1, -30, 1, 0)
+			Title.BackgroundTransparency = 1
+			Title.TextXAlignment = Enum.TextXAlignment.Left
+			
+			local Arrow = Instance.new("TextLabel", Header)
+			Arrow.Text = "▼"
+			Arrow.TextColor3 = Theme.Muted
+			Arrow.Position = UDim2.new(1, -25, 0, 0)
+			Arrow.Size = UDim2.new(0, 25, 1, 0)
+			Arrow.BackgroundTransparency = 1
+			
+			local function Refresh()
+				for _, v in pairs(Container:GetChildren()) do
+					if v:IsA("TextButton") and v ~= Header then v:Destroy() end
+				end
+				if expanded then
+					for i, opt in pairs(options) do
+						local OptBtn = Instance.new("TextButton", Container)
+						OptBtn.Size = UDim2.new(1, -10, 0, 25)
+						OptBtn.BackgroundColor3 = Theme.Main
+						OptBtn.Text = tostring(opt)
+						OptBtn.TextColor3 = Theme.Muted
+						OptBtn.Font = Theme.Font
+						OptBtn.TextSize = 11
+						OptBtn.LayoutOrder = i
+						OptBtn.Position = UDim2.new(0, 5, 0, 36 + ((i-1)*27))
+						Instance.new("UICorner", OptBtn).CornerRadius = UDim.new(0, 4)
+						OptBtn.MouseButton1Click:Connect(function()
+							selected = opt
+							Title.Text = text .. ": " .. tostring(selected)
+							expanded = false
+							TweenService:Create(Container, TweenInfo.new(0.3), {Size = UDim2.new(1, 0, 0, 36)}):Play()
+							TweenService:Create(Arrow, TweenInfo.new(0.3), {Rotation = 0}):Play()
+							pcall(callback, selected)
+						end)
+					end
+					TweenService:Create(Container, TweenInfo.new(0.3), {Size = UDim2.new(1, 0, 0, 36 + (#options * 27) + 5)}):Play()
+					TweenService:Create(Arrow, TweenInfo.new(0.3), {Rotation = 180}):Play()
+				else
+					TweenService:Create(Container, TweenInfo.new(0.3), {Size = UDim2.new(1, 0, 0, 36)}):Play()
+					TweenService:Create(Arrow, TweenInfo.new(0.3), {Rotation = 0}):Play()
+				end
+			end
+			Header.MouseButton1Click:Connect(function() expanded = not expanded; Refresh() end)
+		end
+		
+		function Tab:Textbox(text, placeholder, callback)
+			local BoxFrame = Instance.new("Frame", Page)
+			BoxFrame.Size = UDim2.new(1, 0, 0, 36)
+			BoxFrame.BackgroundColor3 = Theme.Element
+			Instance.new("UICorner", BoxFrame).CornerRadius = UDim.new(0, 4)
+			local BoxLabel = Instance.new("TextLabel", BoxFrame)
+			BoxLabel.Text = text
+			BoxLabel.TextColor3 = Theme.Text
+			BoxLabel.Font = Theme.Font
+			BoxLabel.TextSize = 12
+			BoxLabel.Position = UDim2.new(0, 10, 0, 0)
+			BoxLabel.Size = UDim2.new(0.5, 0, 1, 0)
+			BoxLabel.BackgroundTransparency = 1
+			BoxLabel.TextXAlignment = Enum.TextXAlignment.Left
+			local Input = Instance.new("TextBox", BoxFrame)
+			Input.PlaceholderText = placeholder or "..."
+			Input.Text = ""
+			Input.TextColor3 = Theme.Accent
+			Input.Font = Theme.Font
+			Input.TextSize = 12
+			Input.Position = UDim2.new(0.5, 0, 0.15, 0)
+			Input.Size = UDim2.new(0.45, 0, 0.7, 0)
+			Input.BackgroundColor3 = Theme.Main
+			Instance.new("UICorner", Input).CornerRadius = UDim.new(0, 4)
+			Input.FocusLost:Connect(function(enter) if enter then pcall(callback, Input.Text) end end)
+		end
+
+		return Tab
+	end
+	return Window
+end
+
+
+-- ==================================================================
+-[span_2](start_span)- 2. ARSENAL LOGIC & UI SETUP[span_2](end_span)
+-- ==================================================================
+
+-- CleanUp alter Instanzen
+if getgenv().ArsenalCleanup then getgenv().ArsenalCleanup() end
+
+-- Settings Init
+getgenv().Settings = {
+    Aimbot = false,
+    AimbotFOV = 150,
+    AimbotSmooth = 10,
+    TeamCheck = true,
+    SilentAim = false,
+    HitboxSize = 2,
+    ESP = false,
+    ESP_TeamCheck = true,
+    InfiniteAmmo = false,
+    RapidFire = false,
+    NoRecoil = false,
+    RainbowGun = false,
+    WalkSpeed = 16,
+    JumpPower = 50,
+    InfJump = false
+}
+
+-- [Aimbot Logik]
+local function GetClosestPlayer()
+    local closest = nil
+    local shortestDist = getgenv().Settings.AimbotFOV
+    local mousePos = UserInputService:GetMouseLocation()
+
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+            if getgenv().Settings.TeamCheck and plr.Team == LocalPlayer.Team then continue end
+
+            local pos, onScreen = Camera:WorldToViewportPoint(plr.Character.Head.Position)
+            if onScreen then
+                local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                if dist < shortestDist then
+                    shortestDist = dist
+                    closest = plr.Character.Head
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- [Highlight ESP Logik]
+local Highlights = {}
+local function UpdateESP()
+    if not getgenv().Settings.ESP then
+        for i, hl in pairs(Highlights) do hl:Destroy() Highlights[i] = nil end
+        return
+    end
+
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            if not Highlights[plr] then
+                local hl = Instance.new("Highlight")
+                hl.Name = "PandazESP"
+                hl.FillColor = Color3.fromRGB(255, 0, 0)
+                hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                hl.FillTransparency = 0.5
+                hl.OutlineTransparency = 0
+                hl.Parent = plr.Character
+                Highlights[plr] = hl
+            else
+                if Highlights[plr].Parent ~= plr.Character then
+                    Highlights[plr].Parent = plr.Character
+                end
+            end
+
+            local isTeammate = (plr.Team == LocalPlayer.Team)
+            if getgenv().Settings.ESP_TeamCheck and isTeammate then
+                Highlights[plr].Enabled = false
+            else
+                Highlights[plr].Enabled = true
+                Highlights[plr].FillColor = isTeammate and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+            end
+        elseif Highlights[plr] then
+            Highlights[plr]:Destroy()
+            Highlights[plr] = nil
+        end
+    end
+end
+
+-- [Hitbox Expander Logik]
+local function UpdateHitbox()
+    if not getgenv().Settings.SilentAim then return end
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            if getgenv().Settings.TeamCheck and plr.Team == LocalPlayer.Team then continue end
+            local hrp = plr.Character.HumanoidRootPart
+            hrp.Size = Vector3.new(getgenv().Settings.HitboxSize, getgenv().Settings.HitboxSize, getgenv().Settings.HitboxSize)
+            hrp.Transparency = 0.7
+            hrp.CanCollide = false
+            hrp.Material = Enum.Material.Neon
+        end
+    end
+end
+
+-- [Gun Mods]
+local function GunModsLoop()
+    if getgenv().Settings.InfiniteAmmo then
+        pcall(function()
+            LocalPlayer.PlayerGui.GUI.Client.Variables.ammocount.Value = 999
+            LocalPlayer.PlayerGui.GUI.Client.Variables.ammocount2.Value = 999
+        end)
+    end
+
+    if getgenv().Settings.NoRecoil or getgenv().Settings.RapidFire then
+        pcall(function()
+            for _, v in pairs(getgc(true)) do
+                if type(v) == "table" then
+                    if getgenv().Settings.NoRecoil then
+                        if rawget(v, "Recoil") then v.Recoil = 0 end
+                        if rawget(v, "spread") then v.spread = 0 end
+                    end
+                    if getgenv().Settings.RapidFire then
+                        if rawget(v, "FireRate") then v.FireRate = 0.02 end
+                    end
+                end
+            end
+        end)
+    end
+end
+
+-- [Rainbow Gun]
+local hue = 0
+local function RainbowGunLoop()
+    if not getgenv().Settings.RainbowGun then return end
+    hue = hue + 0.01
+    if hue > 1 then hue = 0 end
+    if Camera:FindFirstChild("Arms") then
+        for _, v in pairs(Camera.Arms:GetDescendants()) do
+            if v:IsA("MeshPart") then
+                v.Color = Color3.fromHSV(hue, 1, 1)
+            end
+        end
+    end
+end
+
+-- [Loops Starten]
+local Loops = {}
+table.insert(Loops, RunService.RenderStepped:Connect(function()
+    UpdateESP()
+    UpdateHitbox()
+    RainbowGunLoop()
+    
+    if getgenv().Settings.Aimbot then
+        local target = GetClosestPlayer()
+        if target then
+            local desired = CFrame.new(Camera.CFrame.Position, target.Position)
+            Camera.CFrame = Camera.CFrame:Lerp(desired, getgenv().Settings.AimbotSmooth / 100)
+        end
+    end
+end))
+
+table.insert(Loops, RunService.Stepped:Connect(function()
+    GunModsLoop()
+end))
+
+table.insert(Loops, UserInputService.JumpRequest:Connect(function()
+    if getgenv().Settings.InfJump and LocalPlayer.Character then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+    end
+end))
+
+table.insert(Loops, RunService.RenderStepped:Connect(function()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        if LocalPlayer.Character.Humanoid.WalkSpeed ~= getgenv().Settings.WalkSpeed then
+            LocalPlayer.Character.Humanoid.WalkSpeed = getgenv().Settings.WalkSpeed
+        end
+    end
+end))
+
+getgenv().ArsenalCleanup = function()
+    for _, conn in pairs(Loops) do conn:Disconnect() end
+    for _, hl in pairs(Highlights) do hl:Destroy() end
+    getgenv().ArsenalCleanup = nil
+end
+-- ==================================================================
+-- 3. UI WINDOW CREATION
+-- ==================================================================
+
+local Window = PandazWare:CreateWindow({
+    Title = "PandazWare | Arsenal | Delta"
+})
+
+-- Combat Tab
+local CombatTab = Window:CreateTab("Combat")
+
+CombatTab:Toggle("Aimbot Active", false, function(state)
+    getgenv().Settings.Aimbot = state
+end)
+
+CombatTab:Slider("Aimbot FOV", 50, 500, 150, function(value)
+    getgenv().Settings.AimbotFOV = value
+end)
+
+CombatTab:Slider("Smoothness", 1, 50, 10, function(value)
+    getgenv().Settings.AimbotSmooth = value
+end)
+
+CombatTab:Toggle("Team Check", true, function(state)
+    getgenv().Settings.TeamCheck = state
+end)
+
+CombatTab:Toggle("Hitbox Expander (Silent)", false, function(state)
+    getgenv().Settings.SilentAim = state
+    if not state then
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                plr.Character.HumanoidRootPart.Size = Vector3.new(2, 2, 1)
+                plr.Character.HumanoidRootPart.Transparency = 1
+            end
+        end
+    end
+end)
+
+CombatTab:Slider("Hitbox Size", 2, 20, 2, function(value)
+    getgenv().Settings.HitboxSize = value
+end)
+
+-- Weapon Tab
+local WeaponTab = Window:CreateTab("Weapon")
+
+WeaponTab:Toggle("Infinite Ammo", false, function(state)
+    getgenv().Settings.InfiniteAmmo = state
+end)
+
+WeaponTab:Toggle("Rapid Fire", false, function(state)
+    getgenv().Settings.RapidFire = state
+    if state then PandazWare:Notify("Warning", "Rapid Fire is risky!", 3) end
+end)
+
+WeaponTab:Toggle("No Recoil", false, function(state)
+    getgenv().Settings.NoRecoil = state
+end)
+
+WeaponTab:Toggle("Rainbow Gun", false, function(state)
+    getgenv().Settings.RainbowGun = state
+end)
+
+-- Visuals Tab
+local VisualTab = Window:CreateTab("Visuals")
+
+VisualTab:Toggle("ESP Active (Highlights)", false, function(state)
+    getgenv().Settings.ESP = state
+    if not state then UpdateESP() end
+end)
+
+VisualTab:Toggle("ESP Team Check", true, function(state)
+    getgenv().Settings.ESP_TeamCheck = state
+end)
+
+-- Player Tab
+local PlayerTab = Window:CreateTab("Player")
+
+PlayerTab:Toggle("Infinite Jump", false, function(state)
+    getgenv().Settings.InfJump = state
+end)
+
+PlayerTab:Slider("WalkSpeed", 16, 150, 16, function(value)
+    getgenv().Settings.WalkSpeed = value
+end)
+
+PandazWare:Notify("Success", "Loaded for Delta!", 5)
