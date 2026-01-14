@@ -1,0 +1,607 @@
+--[[
+    PandazWare x Binxix V5 Merged (ULTIMATE VERSION)
+    PART 1: Config & Aimbot Engine
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local TeleportService = game:GetService("TeleportService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- // LIBRARY LADEN //
+local LibraryURL = "https://raw.githubusercontent.com/PandazWare/PandazWare/refs/heads/main/PandazWare%20libary"
+local success, PandazWare = pcall(function()
+    return loadstring(game:HttpGet(LibraryURL))()
+end)
+
+if not success or not PandazWare then return warn("Lib failed") end
+
+-- // GLOBAL CONFIG //
+getgenv().Config = {
+    Aimbot = {
+        Enabled = false,
+        AimPart = "Head",
+        FOVRadius = 150,
+        ShowFOV = true,
+        Smoothness = 0.15,
+        Prediction = true,
+        PredAmount = 0.12, -- Binxix default
+        TeamCheck = true,
+        WallCheck = true,
+        StickyAim = true,
+        MaxDistance = 1000,
+        SnapOnAcquire = false
+    },
+    ESP = {
+        MasterSwitch = false,
+        Box = true,
+        BoxType = "Corner", -- Corner or Full
+        Skeleton = true,
+        Tracers = true,
+        TracerOrigin = "Bottom",
+        Name = true,
+        Health = true,
+        Distance = true,
+        HeadDot = true,
+        OffscreenArrows = true,
+        ArrowRadius = 200,
+        TeamCheck = true
+    },
+    Visuals = {
+        Fullbright = false,
+        NoFog = false,
+        Crosshair = false,
+        CrosshairSize = 10,
+        FOV = 70
+    },
+    Movement = {
+        Fly = false,
+        FlySpeed = 50,
+        BunnyHop = false,
+        SpeedHack = false,
+        SpeedVal = 16,
+        JumpHack = false,
+        JumpVal = 50,
+        SpinBot = false,
+        SpinSpeed = 10
+    },
+    Combat = {
+        NoRecoil = false,
+        NoSpread = false,
+        RapidFire = false,
+        InfiniteAmmo = false, -- Specific Binxix Loop
+        KillAll = false
+    },
+    Misc = {
+        ChatSpam = false,
+        SpamMsg = "PandazWare on Top!",
+        SpamDelay = 2
+    }
+}
+
+-- // UTILS & AIMBOT MATH //
+local function isSameTeam(p1, p2)
+    if not p1.Team or not p2.Team then return false end
+    return p1.Team == p2.Team
+end
+
+local function isValidTarget(target)
+    if not target or target == LocalPlayer or not target.Character then return false end
+    if Config.Aimbot.TeamCheck and isSameTeam(LocalPlayer, target) then return false end
+    local hum = target.Character:FindFirstChild("Humanoid")
+    if not hum or hum.Health <= 0 then return false end
+    return true
+end
+
+local function hasLineOfSight(target)
+    if not Config.Aimbot.WallCheck then return true end
+    local origin = Camera.CFrame.Position
+    local targetPart = target.Character:FindFirstChild(Config.Aimbot.AimPart) or target.Character:FindFirstChild("Head")
+    if not targetPart then return false end
+    
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.IgnoreWater = true
+    
+    local dir = targetPart.Position - origin
+    local result = Workspace:Raycast(origin, dir, params)
+    return not result or result.Instance:IsDescendantOf(target.Character)
+end
+
+local function getTargetScore(target)
+    -- Binxix Scoring Logic (Distance + FOV Priority)
+    local char = target.Character
+    local part = char:FindFirstChild(Config.Aimbot.AimPart) or char:FindFirstChild("Head")
+    if not part then return math.huge end
+    
+    local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+    if not onScreen then return math.huge end
+    
+    local mouse = UserInputService:GetMouseLocation()
+    local distToMouse = (Vector2.new(pos.X, pos.Y) - mouse).Magnitude
+    
+    if distToMouse > Config.Aimbot.FOVRadius then return math.huge end
+    if not hasLineOfSight(target) then return math.huge end
+    
+    return distToMouse -- Prioritize closest to crosshair
+end
+
+local currentTarget = nil
+local function GetBestTarget()
+    local bestT, bestScore = nil, math.huge
+    for _, p in pairs(Players:GetPlayers()) do
+        if isValidTarget(p) then
+            local score = getTargetScore(p)
+            if score < bestScore then
+                bestScore = score
+                bestT = p
+            end
+        end
+    end
+    return bestT
+end
+
+-- Prediction Logic
+local function getPredictedPos(target)
+    if not target or not target.Character then return nil end
+    local part = target.Character:FindFirstChild(Config.Aimbot.AimPart) or target.Character:FindFirstChild("Head")
+    if not part then return nil end
+    
+    local pos = part.Position
+    if Config.Aimbot.Prediction then
+        local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            pos = pos + (hrp.AssemblyLinearVelocity * Config.Aimbot.PredAmount)
+        end
+    end
+    return pos
+end
+
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Color = Color3.fromRGB(130, 80, 200)
+FOVCircle.Thickness = 1.5
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+
+RunService.RenderStepped:Connect(function()
+    FOVCircle.Visible = Config.Aimbot.Enabled and Config.Aimbot.ShowFOV
+    FOVCircle.Radius = Config.Aimbot.FOVRadius
+    FOVCircle.Position = UserInputService:GetMouseLocation()
+
+    if Config.Aimbot.Enabled then
+        if not currentTarget or not isValidTarget(currentTarget) then
+            currentTarget = GetBestTarget()
+            -- Snap on Acquire logic from Binxix
+            if currentTarget and Config.Aimbot.SnapOnAcquire then
+                 local predPos = getPredictedPos(currentTarget)
+                 if predPos then Camera.CFrame = CFrame.new(Camera.CFrame.Position, predPos) end
+            end
+        else
+            -- Sticky Aim Check
+            if not Config.Aimbot.StickyAim then
+                 currentTarget = GetBestTarget()
+            else
+                 -- Lost target check
+                 local score = getTargetScore(currentTarget)
+                 if score == math.huge then currentTarget = nil end
+            end
+        end
+
+        if currentTarget then
+            local predPos = getPredictedPos(currentTarget)
+            if predPos then
+                local currentCF = Camera.CFrame
+                local targetCF = CFrame.new(currentCF.Position, predPos)
+                -- Smoothness Logic
+                Camera.CFrame = currentCF:Lerp(targetCF, Config.Aimbot.Smoothness)
+            end
+        end
+    else
+        currentTarget = nil
+    end
+end)
+--[[
+    PandazWare x Binxix V5 Merged
+    PART 2: Advanced ESP System (Clean ESP)
+]]
+
+local ESP_Storage = {}
+local Colors = {
+    ESP_Visible = Color3.fromRGB(0, 255, 200),
+    ESP_Hidden = Color3.fromRGB(255, 80, 80),
+    Skeleton = Color3.fromRGB(255, 255, 255)
+}
+
+local SKELETON_CONNECTIONS = {
+    {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"},
+    {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"LeftLowerArm", "LeftHand"},
+    {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"RightLowerArm", "RightHand"},
+    {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LeftLowerLeg", "LeftFoot"},
+    {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}, {"RightLowerLeg", "RightFoot"}
+}
+
+local R6_CONNECTIONS = {
+    {"Head", "Torso"}, {"Torso", "Left Arm"}, {"Torso", "Right Arm"}, 
+    {"Torso", "Left Leg"}, {"Torso", "Right Leg"}
+}
+
+local function DrawLine(frame, p1, p2, color)
+    local distance = (p2 - p1).Magnitude
+    local center = (p1 + p2) / 2
+    local angle = math.atan2(p2.Y - p1.Y, p2.X - p1.X)
+    frame.Size = UDim2.new(0, distance, 0, 1) -- Thickness fixed to 1 for performance
+    frame.Position = UDim2.new(0, center.X, 0, center.Y)
+    frame.Rotation = math.deg(angle)
+    frame.BackgroundColor3 = color
+    frame.Visible = true
+end
+
+local function CreateESP(plr)
+    if ESP_Storage[plr] then return end
+
+    -- 1. Billboard for Info & Box
+    local BGui = Instance.new("BillboardGui")
+    BGui.Name = "BinxixESP"
+    BGui.AlwaysOnTop = true
+    BGui.Size = UDim2.new(4.5, 0, 6, 0)
+    BGui.StudsOffset = Vector3.new(0, 0.5, 0)
+    
+    local Container = Instance.new("Frame", BGui)
+    Container.Size = UDim2.new(1,0,1,0)
+    Container.BackgroundTransparency = 1
+
+    -- Box Border (Corner Style Impl simplified to Stroke for stability)
+    local BoxStroke = Instance.new("UIStroke", Container)
+    BoxStroke.Thickness = 1.5
+    BoxStroke.Transparency = 0
+    BoxStroke.Color = Colors.ESP_Hidden
+
+    -- Text Info
+    local InfoLabel = Instance.new("TextLabel", Container)
+    InfoLabel.BackgroundTransparency = 1
+    InfoLabel.Size = UDim2.new(1,0,0,15)
+    InfoLabel.Position = UDim2.new(0,0,-0.2,0)
+    InfoLabel.TextColor3 = Color3.new(1,1,1)
+    InfoLabel.TextStrokeTransparency = 0
+    InfoLabel.TextSize = 11
+    InfoLabel.Font = Enum.Font.GothamBold
+
+    -- Health Bar
+    local HBG = Instance.new("Frame", Container)
+    HBG.Size = UDim2.new(0, 2, 1, 0)
+    HBG.Position = UDim2.new(0, -4, 0, 0)
+    HBG.BackgroundColor3 = Color3.new(0,0,0)
+    HBG.BorderSizePixel = 0
+    local HFill = Instance.new("Frame", HBG)
+    HFill.Size = UDim2.new(1,0,1,0)
+    HFill.BackgroundColor3 = Color3.new(0,1,0)
+    HFill.BorderSizePixel = 0
+    HFill.AnchorPoint = Vector2.new(0,1)
+    HFill.Position = UDim2.new(0,0,1,0)
+
+    -- 2. ScreenGui for Lines (Skeleton/Tracers)
+    local ScreenFolder = Instance.new("Folder", game.CoreGui)
+    ScreenFolder.Name = "ESP_Lines_"..plr.Name
+    
+    -- Create Skeleton Lines (Pool)
+    local SkelLines = {}
+    for i=1, 15 do
+        local l = Instance.new("Frame", ScreenFolder)
+        l.BorderSizePixel = 0
+        l.Visible = false
+        table.insert(SkelLines, l)
+    end
+
+    -- Tracer Line
+    local TracerLine = Instance.new("Frame", ScreenFolder)
+    TracerLine.BorderSizePixel = 0
+    TracerLine.Visible = false
+
+    -- Arrow Frame (Offscreen)
+    local ArrowFrame = Instance.new("Frame", ScreenFolder)
+    ArrowFrame.Size = UDim2.new(0, 15, 0, 15)
+    ArrowFrame.BackgroundColor3 = Colors.ESP_Hidden
+    ArrowFrame.Visible = false
+    local ArrowCorner = Instance.new("UICorner", ArrowFrame)
+    ArrowCorner.CornerRadius = UDim.new(1,0)
+
+    ESP_Storage[plr] = {
+        BGui = BGui, Info = InfoLabel, BoxS = BoxStroke, 
+        HBG = HBG, HFill = HFill,
+        ScreenF = ScreenFolder, Skel = SkelLines, Tracer = TracerLine, Arrow = ArrowFrame
+    }
+end
+
+local function UpdateESP()
+    for plr, data in pairs(ESP_Storage) do
+        local shouldShow = Config.ESP.MasterSwitch and isValidTarget(plr)
+        
+        if not shouldShow then
+            data.BGui.Parent = nil
+            data.ScreenF.Parent = nil
+        else
+            local char = plr.Character
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local head = char:FindFirstChild("Head")
+            local hum = char:FindFirstChild("Humanoid")
+
+            if hrp and head and hum then
+                local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
+                local color = hasLineOfSight(plr) and Colors.ESP_Visible or Colors.ESP_Hidden
+
+                -- Billboard Updates
+                data.BGui.Parent = game.CoreGui
+                data.BGui.Adornee = hrp
+                data.BoxS.Color = color
+                data.BoxS.Enabled = Config.ESP.Box
+                
+                local infoText = ""
+                if Config.ESP.Name then infoText = plr.Name end
+                if Config.ESP.Distance then infoText = infoText .. string.format(" [%d]", dist) end
+                data.Info.Text = infoText
+
+                if Config.ESP.Health then
+                    data.HBG.Visible = true
+                    local hp = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                    data.HFill.Size = UDim2.new(1,0,hp,0)
+                    data.HFill.BackgroundColor3 = Color3.fromHSV(hp*0.3, 1, 1)
+                else
+                    data.HBG.Visible = false
+                end
+
+                data.ScreenF.Parent = game.CoreGui -- Ensure visible
+
+                -- Skeletons
+                if Config.ESP.Skeleton and onScreen then
+                    local isR6 = (hum.RigType == Enum.HumanoidRigType.R6)
+                    local connections = isR6 and R6_CONNECTIONS or SKELETON_CONNECTIONS
+                    
+                    for i, link in ipairs(connections) do
+                        local p1 = char:FindFirstChild(link[1])
+                        local p2 = char:FindFirstChild(link[2])
+                        local line = data.Skel[i]
+                        
+                        if p1 and p2 and line then
+                            local v1, os1 = Camera:WorldToViewportPoint(p1.Position)
+                            local v2, os2 = Camera:WorldToViewportPoint(p2.Position)
+                            
+                            if os1 and os2 then
+                                DrawLine(line, Vector2.new(v1.X, v1.Y), Vector2.new(v2.X, v2.Y), Colors.Skeleton)
+                            else
+                                line.Visible = false
+                            end
+                        elseif line then
+                            line.Visible = false
+                        end
+                    end
+                else
+                    for _, l in pairs(data.Skel) do l.Visible = false end
+                end
+
+                -- Tracers
+                if Config.ESP.Tracers and onScreen then
+                    local from = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y) -- Bottom
+                    if Config.ESP.TracerOrigin == "Mouse" then from = UserInputService:GetMouseLocation() end
+                    
+                    DrawLine(data.Tracer, from, Vector2.new(pos.X, pos.Y), color)
+                else
+                    data.Tracer.Visible = false
+                end
+
+                -- Offscreen Arrows (Binxix Logic)
+                if Config.ESP.OffscreenArrows and not onScreen then
+                     local center = Camera.ViewportSize / 2
+                     local dir = (hrp.Position - Camera.CFrame.Position).Unit
+                     local look = Camera.CFrame.LookVector
+                     local rot = math.atan2(dir:Dot(Camera.CFrame.RightVector), dir:Dot(Camera.CFrame.UpVector)) -- Simplified projection
+                     
+                     -- Projection math adapted for 2D screen
+                     local _, os_check = Camera:WorldToViewportPoint(hrp.Position)
+                     if not os_check then
+                         local arrowPos = (Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2) - Vector2.new(pos.X, pos.Y)).Unit
+                         -- This part requires complex projection, using fallback indicator logic:
+                         -- Simple clamp for demonstration of functionality:
+                         data.Arrow.Visible = false -- Arrow math in 2D is complex without full CFrame matrix projection, disabled to prevent bugs
+                     end
+                else
+                    data.Arrow.Visible = false
+                end
+
+            else
+                data.BGui.Parent = nil
+                data.ScreenF.Parent = nil
+            end
+        end
+    end
+end
+RunService.RenderStepped:Connect(UpdateESP)
+Players.PlayerAdded:Connect(CreateESP)
+for _,p in pairs(Players:GetPlayers()) do if p ~= LocalPlayer then CreateESP(p) end end
+--[[
+    PandazWare x Binxix V5 Merged
+    PART 3: Movement, Gun Mods & Logic Loops
+]]
+
+-- // MOVEMENT SYSTEMS //
+local BodyVel, BodyGyr = nil, nil
+
+local function StartFly()
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = LocalPlayer.Character.HumanoidRootPart
+    
+    BodyVel = Instance.new("BodyVelocity", hrp)
+    BodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    BodyVel.Velocity = Vector3.zero
+    
+    BodyGyr = Instance.new("BodyGyro", hrp)
+    BodyGyr.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    BodyGyr.P = 9e4
+    BodyGyr.CFrame = hrp.CFrame
+    
+    LocalPlayer.Character.Humanoid.PlatformStand = true
+end
+
+local function StopFly()
+    if BodyVel then BodyVel:Destroy() BodyVel = nil end
+    if BodyGyr then BodyGyr:Destroy() BodyGyr = nil end
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.PlatformStand = false
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    -- Fly Logic
+    if Config.Movement.Fly and BodyVel and BodyGyr then
+        local cam = Workspace.CurrentCamera
+        local speed = Config.Movement.FlySpeed
+        local moveDir = Vector3.zero
+        
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0,1,0) end
+        
+        if moveDir.Magnitude > 0 then moveDir = moveDir.Unit * speed end
+        BodyVel.Velocity = moveDir
+        BodyGyr.CFrame = cam.CFrame
+    end
+
+    -- BunnyHop
+    if Config.Movement.BunnyHop and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+        local h = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+        if h and h:GetState() ~= Enum.HumanoidStateType.Jumping and h:GetState() ~= Enum.HumanoidStateType.Freefall then
+            h:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+
+    -- SpinBot
+    if Config.Movement.SpinBot and LocalPlayer.Character then
+        local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(Config.Movement.SpinSpeed), 0)
+        end
+    end
+end)
+
+-- // GUN MODS //
+task.spawn(function()
+    while task.wait(0.5) do
+        -- 1. Infinite Ammo (Binxix Method: Scanning values)
+        if Config.Combat.InfiniteAmmo then
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char then
+                    for _, tool in ipairs(char:GetChildren()) do
+                        if tool:IsA("Tool") then
+                            for _, desc in ipairs(tool:GetDescendants()) do
+                                local name = desc.Name:lower()
+                                if (name:find("ammo") or name:find("clip") or name:find("mag")) and (desc:IsA("IntValue") or desc:IsA("NumberValue")) then
+                                    if desc.Value < 999 then desc.Value = 999 end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        
+        -- 2. Recoil/Spread (Generic GC Method)
+        if Config.Combat.NoRecoil or Config.Combat.NoSpread or Config.Combat.RapidFire then
+            pcall(function()
+                for _, v in pairs(getgc(true)) do
+                    if type(v) == "table" and rawget(v, "Recoil") then
+                        if Config.Combat.NoRecoil then v.Recoil = 0 end
+                        if Config.Combat.NoSpread then v.Spread = 0 end
+                        if Config.Combat.RapidFire then v.FireRate = 0.05 end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- // CHAT SPAMMER //
+task.spawn(function()
+    while task.wait(Config.Misc.SpamDelay) do
+        if Config.Misc.ChatSpam then
+            pcall(function()
+                local TextChatService = game:GetService("TextChatService")
+                if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+                    TextChatService.TextChannels.RBXGeneral:SendAsync(Config.Misc.SpamMsg)
+                else
+                    game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(Config.Misc.SpamMsg, "All")
+                end
+            end)
+        end
+    end
+end)
+--[[
+    PandazWare x Binxix V5 Merged
+    PART 4: User Interface
+]]
+
+local Window = PandazWare:CreateWindow({Title = "PandazWare | Binxix V5 Merge"})
+
+-- === COMBAT TAB ===
+local Combat = Window:CreateTab("Combat")
+
+Combat:Toggle("Aimbot Active", false, function(v) Config.Aimbot.Enabled = v end)
+Combat:Toggle("Show FOV", true, function(v) Config.Aimbot.ShowFOV = v end)
+Combat:Slider("FOV Radius", 10, 500, 150, function(v) Config.Aimbot.FOVRadius = v end)
+Combat:Slider("Smoothness (Lower=Slow)", 0, 100, 15, function(v) Config.Aimbot.Smoothness = v/100 end)
+Combat:Toggle("Prediction", true, function(v) Config.Aimbot.Prediction = v end)
+Combat:Toggle("Wall Check", true, function(v) Config.Aimbot.WallCheck = v end)
+Combat:Toggle("Sticky Aim", true, function(v) Config.Aimbot.StickyAim = v end)
+Combat:Button("--- Gun Mods ---", function() end)
+Combat:Toggle("Infinite Ammo (Value)", false, function(v) Config.Combat.InfiniteAmmo = v end)
+Combat:Toggle("No Recoil", false, function(v) Config.Combat.NoRecoil = v end)
+Combat:Toggle("Rapid Fire", false, function(v) Config.Combat.RapidFire = v end)
+
+-- === VISUALS TAB ===
+local Visuals = Window:CreateTab("Visuals")
+
+Visuals:Toggle("ESP Master", false, function(v) Config.ESP.MasterSwitch = v end)
+Visuals:Toggle("Boxes", true, function(v) Config.ESP.Box = v end)
+Visuals:Toggle("Skeletons", true, function(v) Config.ESP.Skeleton = v end)
+Visuals:Toggle("Tracers", true, function(v) Config.ESP.Tracers = v end)
+Visuals:Toggle("Names", true, function(v) Config.ESP.Name = v end)
+Visuals:Toggle("Health Bar", true, function(v) Config.ESP.Health = v end)
+Visuals:Button("--- World ---", function() end)
+Visuals:Toggle("Fullbright", false, function(v) 
+    Config.Visuals.Fullbright = v 
+    Lighting.Ambient = v and Color3.new(1,1,1) or Color3.fromRGB(127,127,127) 
+end)
+
+-- === MOVEMENT TAB ===
+local Move = Window:CreateTab("Movement")
+
+Move:Toggle("Fly", false, function(v) 
+    Config.Movement.Fly = v
+    if v then StartFly() else StopFly() end
+end)
+Move:Slider("Fly Speed", 10, 300, 50, function(v) Config.Movement.FlySpeed = v end)
+Move:Toggle("Bunny Hop", false, function(v) Config.Movement.BunnyHop = v end)
+Move:Toggle("Spin Bot", false, function(v) Config.Movement.SpinBot = v end)
+Move:Slider("Spin Speed", 1, 50, 10, function(v) Config.Movement.SpinSpeed = v end)
+
+-- === MISC TAB ===
+local Misc = Window:CreateTab("Misc")
+
+Misc:Toggle("Chat Spam", false, function(v) Config.Misc.ChatSpam = v end)
+Misc:Textbox("Spam Message", "Type here...", function(v) Config.Misc.SpamMsg = v end)
+Misc:Button("Server Hop", function()
+    TeleportService:Teleport(game.PlaceId, LocalPlayer)
+end)
+Misc:Button("Rejoin", function()
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+end)
+
+PandazWare:Notify("Loaded", "Merged Binxix Features successfully!", 5)
