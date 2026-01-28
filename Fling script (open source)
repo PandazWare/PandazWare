@@ -1,0 +1,158 @@
+
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/PandazWare/PandazWare/refs/heads/main/PandazWare%20libary"))()
+
+
+local Window = Library:CreateWindow({
+    Title = "Universal Fling | PandazWare"
+})
+
+
+local MainTab = Window:CreateTab("Main")
+local SettingsTab = Window:CreateTab("Settings")
+
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+
+local TargetName = ""
+local Flinging = false
+local FlingPower = 9000 -- Standard Power
+
+
+local function GetPlayer(Name)
+    Name = Name:lower()
+    if Name == "all" or Name == "others" then
+        return "All"
+    elseif Name == "random" then
+        local GetPlayers = Players:GetPlayers()
+        if table.find(GetPlayers, LocalPlayer) then 
+            table.remove(GetPlayers, table.find(GetPlayers, LocalPlayer)) 
+        end
+        return GetPlayers[math.random(#GetPlayers)]
+    else
+        for _, x in next, Players:GetPlayers() do
+            if x ~= LocalPlayer then
+                if x.Name:lower():match("^"..Name) or x.DisplayName:lower():match("^"..Name) then
+                    return x
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function SkidFling(TargetPlayer)
+    if not TargetPlayer then return end
+    if TargetPlayer.UserId == 1414978355 then 
+        Library:Notify("Error", "User is Whitelisted!", 3)
+        return 
+    end
+
+    local Character = LocalPlayer.Character
+    local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+    local RootPart = Humanoid and Humanoid.RootPart
+
+    local TCharacter = TargetPlayer.Character
+    local THumanoid = TCharacter and TCharacter:FindFirstChildOfClass("Humanoid")
+    local TRootPart = TCharacter and TCharacter:FindFirstChild("HumanoidRootPart")
+
+    if not Character or not Humanoid or not RootPart then return end
+    if not TCharacter or not THumanoid or not TRootPart then 
+        Library:Notify("Error", "Target not found or dead", 3)
+        return 
+    end
+    
+    if THumanoid.Sit then
+        Library:Notify("Info", "Target is sitting (might be harder to fling)", 3)
+    end
+
+    Library:Notify("Fling", "Flinging " .. TargetPlayer.Name .. "...", 3)
+    
+    local OldPos = RootPart.CFrame
+    Flinging = true
+    
+  
+    local oldFallenParts = Workspace.FallenPartsDestroyHeight
+    Workspace.FallenPartsDestroyHeight = 0/0 
+    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+
+    local BV = Instance.new("BodyVelocity")
+    BV.Parent = RootPart
+    BV.Velocity = Vector3.new(9e9, 9e9, 9e9)
+    BV.MaxForce = Vector3.new(1/0, 1/0, 1/0)
+    
+    local Time = tick()
+    local Duration = 2.5 -- Max Fling Zeit
+
+    repeat
+        task.wait()
+        if RootPart and TRootPart and Flinging then
+            RootPart.RotVelocity = Vector3.new(FlingPower, FlingPower, FlingPower)
+            
+            
+            local angle = tick() * 10
+            local offset = CFrame.new(0, 0.5, 0)
+            RootPart.CFrame = TRootPart.CFrame * offset + TRootPart.Velocity/1.5
+            Character:SetPrimaryPartCFrame(TRootPart.CFrame * offset)
+            RootPart.Velocity = Vector3.new(9e9, 9e9, 9e9)
+        else
+            break
+        end
+    until not TargetPlayer.Parent or THumanoid.Health <= 0 or tick() > Time + Duration or not Flinging
+
+  
+    BV:Destroy()
+    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+    Workspace.FallenPartsDestroyHeight = oldFallenParts
+    
+    RootPart.Velocity = Vector3.zero
+    RootPart.RotVelocity = Vector3.zero
+    RootPart.CFrame = OldPos
+    Flinging = false
+end
+
+
+MainTab:Textbox("Target Name", "Name / All / Random", function(text)
+    TargetName = text
+end)
+
+MainTab:Button("FLING TARGET", function()
+    local target = GetPlayer(TargetName)
+    if target == "All" then
+        Library:Notify("Fling", "Flinging EVERYONE...", 3)
+        for _, pl in pairs(Players:GetPlayers()) do
+            if pl ~= LocalPlayer then
+                SkidFling(pl)
+                task.wait(0.5) 
+            end
+        end
+    elseif target then
+        SkidFling(target)
+    else
+        Library:Notify("Error", "Player not found!", 3)
+    end
+end)
+
+MainTab:Button("Stop Fling", function()
+    Flinging = false
+    Library:Notify("Stopped", "Fling cancelled.", 2)
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        char.HumanoidRootPart.Velocity = Vector3.zero
+        char.HumanoidRootPart.RotVelocity = Vector3.zero
+    end
+end)
+
+
+SettingsTab:Slider("Fling Power", 1000, 20000, 9000, function(value)
+    FlingPower = value
+end)
+
+SettingsTab:Button("Rejoin Server", function()
+    game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
+end)
+
+Library:Notify("Loaded", "PandazWare Fling Script Ready!", 5)
