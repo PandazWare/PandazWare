@@ -1,0 +1,278 @@
+repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
+
+if getgenv().PandazwareInstance then
+    if game.CoreGui:FindFirstChild("PandazwareGui") then
+        game.CoreGui.PandazwareGui:Destroy()
+    end
+    getgenv().PandazwareActive = false 
+end
+getgenv().PandazwareInstance = true
+
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
+local Stats = game:GetService("Stats")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+local isAfkEnabled = true
+local isGuiVisible = true
+
+local accumulatedTime = 0
+local sessionStart = tick()
+local isTimerRunning = true
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "PandazwareGui"
+ScreenGui.Parent = CoreGui
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local PandaButton = Instance.new("TextButton")
+local PandaCorner = Instance.new("UICorner")
+local PandaStroke = Instance.new("UIStroke")
+
+PandaButton.Name = "PandaToggle"
+PandaButton.Parent = ScreenGui
+PandaButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+PandaButton.Position = UDim2.new(0.02, 0, 0.45, 0)
+PandaButton.Size = UDim2.new(0, 45, 0, 45)
+PandaButton.Font = Enum.Font.GothamBold
+PandaButton.Text = "🐼"
+PandaButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+PandaButton.TextSize = 24
+PandaButton.AutoButtonColor = true
+
+PandaCorner.CornerRadius = UDim.new(0, 12)
+PandaCorner.Parent = PandaButton
+
+PandaStroke.Parent = PandaButton
+PandaStroke.Color = Color3.fromRGB(50, 50, 50)
+PandaStroke.Thickness = 2
+PandaStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+local MainFrame = Instance.new("Frame")
+local MainCorner = Instance.new("UICorner")
+local TopBar = Instance.new("Frame")
+local TitleLabel = Instance.new("TextLabel")
+local CloseButton = Instance.new("TextButton")
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
+MainFrame.Size = UDim2.new(0, 260, 0, 170)
+MainFrame.ClipsDescendants = true
+MainFrame.Visible = true
+
+MainCorner.CornerRadius = UDim.new(0, 8)
+MainCorner.Parent = MainFrame
+
+TopBar.Name = "TopBar"
+TopBar.Parent = MainFrame
+TopBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+TopBar.Size = UDim2.new(1, 0, 0, 35)
+Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 8)
+
+TitleLabel.Parent = TopBar
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.Size = UDim2.new(0.8, 0, 1, 0)
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.Text = "Pandazware Anti-AFK"
+TitleLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+TitleLabel.TextSize = 14
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+CloseButton.Parent = TopBar
+CloseButton.BackgroundTransparency = 1
+CloseButton.Position = UDim2.new(1, -35, 0, 0)
+CloseButton.Size = UDim2.new(0, 35, 0, 35)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(150, 150, 150)
+CloseButton.TextSize = 14
+
+local ToggleContainer = Instance.new("Frame")
+local SwitchLabel = Instance.new("TextLabel")
+local SwitchBg = Instance.new("TextButton")
+local SwitchCircle = Instance.new("Frame")
+local SwitchCorner = Instance.new("UICorner")
+local CircleCorner = Instance.new("UICorner")
+
+ToggleContainer.Name = "ToggleContainer"
+ToggleContainer.Parent = MainFrame
+ToggleContainer.BackgroundTransparency = 1
+ToggleContainer.Position = UDim2.new(0.05, 0, 0.25, 0)
+ToggleContainer.Size = UDim2.new(0.9, 0, 0, 30)
+
+SwitchLabel.Parent = ToggleContainer
+SwitchLabel.BackgroundTransparency = 1
+SwitchLabel.Size = UDim2.new(0.6, 0, 1, 0)
+SwitchLabel.Font = Enum.Font.GothamBold
+SwitchLabel.Text = "Anti-AFK Status"
+SwitchLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+SwitchLabel.TextSize = 14
+SwitchLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+SwitchBg.Name = "SwitchBg"
+SwitchBg.Parent = ToggleContainer
+SwitchBg.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+SwitchBg.Position = UDim2.new(0.75, 0, 0.1, 0)
+SwitchBg.Size = UDim2.new(0, 44, 0, 24)
+SwitchBg.Text = ""
+SwitchBg.AutoButtonColor = false
+
+SwitchCorner.CornerRadius = UDim.new(1, 0)
+SwitchCorner.Parent = SwitchBg
+
+SwitchCircle.Name = "Knob"
+SwitchCircle.Parent = SwitchBg
+SwitchCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+SwitchCircle.Position = UDim2.new(1, -22, 0.5, -9)
+SwitchCircle.Size = UDim2.new(0, 18, 0, 18)
+
+CircleCorner.CornerRadius = UDim.new(1, 0)
+CircleCorner.Parent = SwitchCircle
+
+local StatsContainer = Instance.new("Frame")
+StatsContainer.Parent = MainFrame
+StatsContainer.BackgroundTransparency = 1
+StatsContainer.Position = UDim2.new(0.05, 0, 0.5, 0)
+StatsContainer.Size = UDim2.new(0.9, 0, 0.45, 0)
+
+local function createStat(order, title)
+    local frame = Instance.new("Frame")
+    frame.Parent = StatsContainer
+    frame.BackgroundTransparency = 1
+    frame.Size = UDim2.new(1, 0, 0, 20)
+    frame.Position = UDim2.new(0, 0, 0, (order-1)*25)
+    
+    local name = Instance.new("TextLabel")
+    name.Parent = frame
+    name.BackgroundTransparency = 1
+    name.Size = UDim2.new(0.4, 0, 1, 0)
+    name.Font = Enum.Font.SourceSans
+    name.Text = title
+    name.TextColor3 = Color3.fromRGB(160, 160, 160)
+    name.TextXAlignment = Enum.TextXAlignment.Left
+    name.TextSize = 14
+    
+    local val = Instance.new("TextLabel")
+    val.Parent = frame
+    val.BackgroundTransparency = 1
+    val.Position = UDim2.new(0.4, 0, 0, 0)
+    val.Size = UDim2.new(0.6, 0, 1, 0)
+    val.Font = Enum.Font.SourceSansBold
+    val.Text = "..."
+    val.TextColor3 = Color3.fromRGB(255, 255, 255)
+    val.TextXAlignment = Enum.TextXAlignment.Right
+    val.TextSize = 14
+    
+    return val
+end
+
+local TimerLabel = createStat(1, "UPTIME")
+local FPSLabel = createStat(2, "FPS")
+local PingLabel = createStat(3, "PING")
+
+local function enableDragging(frame)
+    local dragging, dragInput, dragStart, startPos
+    local function update(input)
+        local delta = input.Position - dragStart
+        local targetPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        TweenService:Create(frame, TweenInfo.new(0.05), {Position = targetPos}):Play()
+    end
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+        end
+    end)
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input) if input == dragInput and dragging then update(input) end end)
+end
+
+enableDragging(PandaButton)
+enableDragging(MainFrame)
+
+PandaButton.MouseButton1Click:Connect(function()
+    isGuiVisible = not isGuiVisible
+    MainFrame.Visible = isGuiVisible
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+    isGuiVisible = false
+    MainFrame.Visible = false
+end)
+
+SwitchBg.MouseButton1Click:Connect(function()
+    isAfkEnabled = not isAfkEnabled
+    
+    if isAfkEnabled then
+        isTimerRunning = true
+        sessionStart = tick()
+        TweenService:Create(SwitchBg, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(46, 204, 113)}):Play()
+        TweenService:Create(SwitchCircle, TweenInfo.new(0.2), {Position = UDim2.new(1, -22, 0.5, -9)}):Play()
+        SwitchLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    else
+        isTimerRunning = false
+        accumulatedTime = accumulatedTime + (tick() - sessionStart)
+        TweenService:Create(SwitchBg, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(80, 80, 80)}):Play()
+        TweenService:Create(SwitchCircle, TweenInfo.new(0.2), {Position = UDim2.new(0, 4, 0.5, -9)}):Play()
+        SwitchLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+    end
+end)
+
+LocalPlayer.Idled:Connect(function()
+    if isAfkEnabled then
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+        TweenService:Create(PandaButton, TweenInfo.new(0.1), {Size = UDim2.new(0, 40, 0, 40)}):Play()
+        task.wait(0.1)
+        TweenService:Create(PandaButton, TweenInfo.new(0.1), {Size = UDim2.new(0, 45, 0, 45)}):Play()
+    end
+end)
+
+local fpsArr = {}
+
+task.spawn(function()
+    while getgenv().PandazwareInstance do
+        local currentTotalTime = accumulatedTime
+        if isTimerRunning then
+            currentTotalTime = accumulatedTime + (tick() - sessionStart)
+        end
+        
+        local h = math.floor(currentTotalTime / 3600)
+        local m = math.floor((currentTotalTime % 3600) / 60)
+        local s = math.floor(currentTotalTime % 60)
+        TimerLabel.Text = string.format("%02d:%02d:%02d", h, m, s)
+        
+        local ping = 0
+        pcall(function() ping = math.floor(Stats.PerformanceStats.Ping:GetValue()) end)
+        PingLabel.Text = ping .. " ms"
+        
+        task.wait(0.5)
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    local now = tick()
+    table.insert(fpsArr, now)
+    for i = #fpsArr, 1, -1 do
+        if fpsArr[i] < now - 1 then table.remove(fpsArr, i) end
+    end
+    FPSLabel.Text = tostring(#fpsArr)
+end)
+
+game.StarterGui:SetCore("SendNotification", {
+    Title = "Pandazware Loaded",
+    Text = "Click the Panda 🐼 to open!",
+    Duration = 4
+})
